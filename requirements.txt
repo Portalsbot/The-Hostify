@@ -1,0 +1,5 @@
+pyrofork
+motor
+python-dotenv
+psutil
+aiohttp
