@@ -58,6 +58,14 @@ async def main() -> None:
         await app.start()
         app_started = True
 
+        me = await app.get_me()
+
+logger.info(
+    "CONNECTED BOT: @%s | BOT ID: %s",
+    me.username,
+    me.id,
+)
+
         watchdog_task = asyncio.create_task(
             watchdog_loop(app),
             name="hostify-watchdog",
