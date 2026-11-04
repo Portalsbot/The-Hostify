@@ -1,8 +1,11 @@
+
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
+from aiohttp import web
 from pyrogram import Client, idle
 
 from config import API_ID, API_HASH, BOT_TOKEN
@@ -24,13 +27,34 @@ app = Client(
 )
 
 
+async def health(request):
+    return web.json_response({
+        "status": "ok",
+        "service": "The Hostify",
+    })
+
+
 async def main() -> None:
-    watchdog_task: asyncio.Task | None = None
+    runner = web.AppRunner(web.Application())
+    runner.app.router.add_get("/", health)
+    runner.app.router.add_get("/health", health)
+
+    watchdog_task = None
     app_started = False
+    database_ready = False
 
     try:
-        # Fail before connecting Telegram if MongoDB is unavailable.
+        await runner.setup()
+
+        port = int(os.environ.get("PORT", "10000"))
+        site = web.TCPSite(runner, "0.0.0.0", port)
+        await site.start()
+
+        logger.info("Health server listening on port %s", port)
+
         await verify_database_connection()
+        database_ready = True
+
         await app.start()
         app_started = True
 
@@ -56,7 +80,11 @@ async def main() -> None:
             if app_started:
                 await app.stop()
         finally:
-            await close_database()
+            try:
+                if database_ready:
+                    await close_database()
+            finally:
+                await runner.cleanup()
 
 
 if __name__ == "__main__":
