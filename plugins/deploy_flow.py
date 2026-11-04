@@ -14,6 +14,7 @@ import messages as M
 from database import get_bot
 from deployer import deploy_bot
 from .guard import owner_only
+from .channel import post_deploy_announcement
 
 logger = logging.getLogger("hostify.plugins.deploy_flow")
 
@@ -24,6 +25,7 @@ _RESERVED_ENV_KEYS = {
     "PYTHONPATH", "PYTHONEXECUTABLE", "PYTHONSTARTUP", "PYTHONUSERBASE",
     "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "DYLD_INSERT_LIBRARIES",
     "SHELL", "BASH_ENV", "ENV", "IFS",
+    "PYTHONINSPECT", "PYTHONWARNINGS", "PYTHONFAULTHANDLER",
 }
 _SESSION_TTL_SECONDS = 15 * 60
 _MAX_ENV_VARS = 40
@@ -123,7 +125,10 @@ def _parse_environment(text: str) -> dict[str, str]:
 
         if not _ENV_KEY_PATTERN.fullmatch(key):
             raise ValueError(f"Line {line_number}: invalid variable name.")
-        if key in _RESERVED_ENV_KEYS:
+        if (
+            key in _RESERVED_ENV_KEYS
+            or key.startswith(("PYTHON", "LD_", "DYLD_", "PIP_", "GIT_"))
+        ):
             raise ValueError(f"{key} is reserved and cannot be overridden.")
         if key in result:
             raise ValueError(f"Duplicate environment variable: {key}.")
@@ -287,6 +292,16 @@ async def deploy_input_handler(client: Client, message):
         success, detail = await deploy_bot(name, repo_url, env_vars)
 
         if success:
+            # Channel notifications are best-effort. A database or Telegram
+            # notification error must never turn a successful deployment into
+            # a user-visible deployment failure.
+            try:
+                await post_deploy_announcement(client, name, repo_url, env_vars)
+            except Exception:
+                logger.exception(
+                    "Bot %s deployed, but its channel announcement failed",
+                    name,
+                )
             response = M.M13_DEPLOY_OK.format(name=name, pid=detail)
         else:
             safe_detail = str(detail or "Unknown deployment error")[:_MAX_DETAIL_CHARS]
