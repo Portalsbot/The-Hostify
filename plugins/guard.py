@@ -1,4 +1,3 @@
-
 from pyrogram import filters
 from config import OWNER_ID
 
@@ -24,4 +23,3 @@ def _owner_filter(_, __, message):
 
 # Import this filter in other plugin files to protect owner commands.
 owner_only = filters.create(_owner_filter)
-
