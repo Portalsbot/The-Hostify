@@ -4,13 +4,13 @@ import asyncio
 import logging
 import os
 import re
-import shutil
 import signal
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import aiohttp
+import psutil
 
 from config import BASE_DIR
 from database import add_bot, get_bot, set_bot_username, update_status
@@ -28,6 +28,7 @@ RESERVED_ENV_KEYS = {
     "PYTHONPATH", "PYTHONEXECUTABLE", "PYTHONSTARTUP", "PYTHONUSERBASE",
     "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "DYLD_INSERT_LIBRARIES",
     "SHELL", "BASH_ENV", "ENV", "IFS",
+    "PYTHONINSPECT", "PYTHONWARNINGS", "PYTHONFAULTHANDLER",
 }
 
 CLONE_TIMEOUT_SECONDS = 180
@@ -94,7 +95,10 @@ def _validate_env_vars(env_vars: dict[str, str] | None) -> dict[str, str]:
     for key, value in env_vars.items():
         if not isinstance(key, str) or not ENV_KEY_PATTERN.fullmatch(key):
             raise ValueError(f"Invalid environment variable name: {key!r}.")
-        if key in RESERVED_ENV_KEYS:
+        if (
+            key in RESERVED_ENV_KEYS
+            or key.startswith(("PYTHON", "LD_", "DYLD_", "PIP_", "GIT_"))
+        ):
             raise ValueError(f"Environment variable {key} is reserved by the host.")
         if not isinstance(value, str) or len(value) > 4_096:
             raise ValueError(f"Environment variable {key} must be text of at most 4096 characters.")
@@ -131,6 +135,17 @@ def _child_environment(bot_dir: Path, venv_bin: Path, env_vars: dict[str, str]) 
     return env
 
 
+def _open_append_log(path: Path):
+    """Open an append-only log without following a symbolic-link target."""
+    if path.is_symlink():
+        raise ValueError(f"Refusing to write through symbolic link: {path.name}")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags, 0o600)
+    return os.fdopen(descriptor, "ab")
+
+
 def _tail_file(path: Path, limit: int = LOG_TAIL_BYTES) -> str:
     try:
         with path.open("rb") as stream:
@@ -143,27 +158,27 @@ def _tail_file(path: Path, limit: int = LOG_TAIL_BYTES) -> str:
 
 
 async def _terminate_process(process: asyncio.subprocess.Process) -> None:
-    if process.returncode is not None:
-        return
+    """Terminate the process group, including children of an exited launcher."""
     try:
         if os.name == "posix":
             os.killpg(process.pid, signal.SIGTERM)
-        else:
+        elif process.returncode is None:
             process.terminate()
     except ProcessLookupError:
-        return
+        pass
 
-    try:
-        await asyncio.wait_for(process.wait(), timeout=5)
-    except asyncio.TimeoutError:
+    if process.returncode is None:
         try:
-            if os.name == "posix":
-                os.killpg(process.pid, signal.SIGKILL)
-            else:
-                process.kill()
-        except ProcessLookupError:
-            pass
-        await process.wait()
+            await asyncio.wait_for(process.wait(), timeout=5)
+        except asyncio.TimeoutError:
+            try:
+                if os.name == "posix":
+                    os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    process.kill()
+            except ProcessLookupError:
+                pass
+            await process.wait()
 
 
 async def _run_logged(
@@ -176,7 +191,7 @@ async def _run_logged(
 ) -> tuple[int, str]:
     """Run one build command without blocking the Telegram event loop."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open("ab") as log_file:
+    with _open_append_log(log_path) as log_file:
         process = await asyncio.create_subprocess_exec(
             *args,
             cwd=str(cwd),
@@ -232,12 +247,17 @@ async def _launch(bot_dir: Path, env_vars: dict[str, str]) -> asyncio.subprocess
     if not venv_python.is_file():
         raise FileNotFoundError("Virtual environment is missing; deployment is incomplete.")
 
-    (bot_dir / ".home").mkdir(exist_ok=True)
-    (bot_dir / ".tmp").mkdir(exist_ok=True)
+    for runtime_dir in (bot_dir / ".home", bot_dir / ".tmp"):
+        if runtime_dir.is_symlink():
+            raise ValueError(f"Refusing symbolic-link runtime directory: {runtime_dir.name}")
+        runtime_dir.mkdir(mode=0o700, exist_ok=True)
+        if not runtime_dir.is_dir():
+            raise ValueError(f"Runtime path is not a directory: {runtime_dir.name}")
+
     log_path = bot_dir / "bot.log"
     child_env = _child_environment(bot_dir, venv_bin, env_vars)
 
-    with log_path.open("ab") as log_file:
+    with _open_append_log(log_path) as log_file:
         process = await asyncio.create_subprocess_exec(
             str(venv_python),
             entry,
@@ -301,6 +321,9 @@ async def deploy_bot(name: str, repo_url: str, env_vars: dict[str, str] | None =
                 return False, "Git clone failed; inspect the deployment log on the server."
 
             venv_path = bot_dir / "venv"
+            if venv_path.exists() or venv_path.is_symlink():
+                return False, "Repository contains a reserved venv path; remove it and redeploy."
+
             venv_code, venv_log = await _run_logged(
                 [sys.executable, "-m", "venv", str(venv_path)],
                 cwd=bot_dir,
@@ -343,11 +366,18 @@ async def deploy_bot(name: str, repo_url: str, env_vars: dict[str, str] | None =
                 return False, "No entry point (main.py, bot.py, or app.py) found in repository root."
 
             process = await _launch(bot_dir, safe_env)
+            try:
+                process_created_at = await asyncio.to_thread(
+                    psutil.Process(process.pid).create_time
+                )
+            except psutil.Error:
+                await _terminate_process(process)
+                return False, "Could not verify the launched process identity."
 
             notify_channel = safe_env.get("NOTIFY_CHANNEL")
             try:
                 await add_bot(name, repo_url, safe_env, notify_channel)
-                await update_status(name, "running", process.pid)
+                await update_status(name, "running", process.pid, process_created_at)
             except Exception:
                 await _terminate_process(process)
                 logger.exception("Database registration failed for bot %s", name)
@@ -386,7 +416,10 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
 
         process = await _launch(bot_dir, safe_env)
         try:
-            await update_status(name, "running", process.pid)
+            process_created_at = await asyncio.to_thread(
+                psutil.Process(process.pid).create_time
+            )
+            await update_status(name, "running", process.pid, process_created_at)
         except Exception:
             await _terminate_process(process)
             raise
