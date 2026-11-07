@@ -27,6 +27,7 @@ app = Client(
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
     plugins=dict(root="plugins"),
+    no_updates=False,
 )
 
 
@@ -35,7 +36,6 @@ async def health(request):
         {"status": "ok" if SERVICE_READY else "starting", "service": "The Hostify"},
         status=200 if SERVICE_READY else 503,
     )
-
 
 async def main() -> None:
     global SERVICE_READY
