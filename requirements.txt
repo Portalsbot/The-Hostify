@@ -1,0 +1,6 @@
+pyrofork
+pymongo[srv]>=4.9,<5
+python-dotenv
+psutil
+aiohttp
+cryptography
