@@ -1,6 +1,0 @@
-
-pyrofork
-motor[srv]
-python-dotenv
-psutil
-aiohttp
