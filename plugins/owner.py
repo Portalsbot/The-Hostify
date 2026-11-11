@@ -210,12 +210,12 @@ async def logs_handler(client: Client, message):
     try:
         lines = await read_logs(name, 40)
         if not lines:
-            await _reply(message, f"No log output is available for {name}.")
+            await _quote(message, f"No log output is available for {name}.")
             return
         await _reply(message, f"Last {len(lines)} lines for {name}:\n\n" + "\n".join(lines)[-3400:])
     except Exception:
         logger.exception("Log retrieval failed for %s", name)
-        await _reply(message, f"Could not read logs for {name}.")
+        await _quote(message, f"Could not read logs for {name}.")
 
 def _format_duration(seconds: float) -> str:
     total = max(0, int(seconds))
