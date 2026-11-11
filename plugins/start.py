@@ -132,6 +132,13 @@ async def start_handler(client: Client, message):
             reply_markup=_start_keyboard(),
             disable_web_page_preview=True,
         )
+        command_parts = (message.text or "").split(maxsplit=1)
+        if len(command_parts) == 2 and command_parts[1].strip().casefold() == "admin" and await is_admin(user.id):
+            await message.reply_text(
+                sc(M.M117_ADMIN_ADDED),
+                parse_mode=ParseMode.DISABLED,
+                reply_markup=InlineKeyboardMarkup([_close_row()]),
+            )
     except Exception:
         logger.exception("The /start handler failed")
         await message.reply_text(
