@@ -131,8 +131,8 @@ async def removeadmin_command(client: Client, message):
         row = []
     rows.append([InlineKeyboardButton("Close", callback_data="hostify:ui:close")])
     await message.reply_text(
-        sc("Select the admin you want to remove, senpai."),
-        parse_mode=ParseMode.DISABLED,
+        f"<blockquote>{sc('Select the admin you want to remove, senpai.')}</blockquote>",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(rows),
     )
 
