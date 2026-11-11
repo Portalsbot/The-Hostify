@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import html
 import logging
 import re
 
@@ -8,7 +7,7 @@ from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from database import add_admin, get_admins, is_admin, remove_admin
+from database import add_admin, get_admins, remove_admin
 from smallcaps import sc
 from .guard import is_owner
 
@@ -67,8 +66,10 @@ async def addadmin_input(client: Client, message):
         await add_admin(admin_id, username=username, first_name=first_name, added_by=owner.id)
         _pending_add.pop(owner.id, None)
 
+        bot_username = (await client.get_me()).username
+        start_url = f"https://t.me/{bot_username}?start=admin"
         markup = InlineKeyboardMarkup([[
-            InlineKeyboardButton("Open Hostify", url=f"https://t.me/{(await client.get_me()).username}?start=admin"),
+            InlineKeyboardButton("Open Hostify", url=start_url),
             InlineKeyboardButton("Close", callback_data="hostify:ui:close"),
         ]])
         try:
@@ -81,10 +82,17 @@ async def addadmin_input(client: Client, message):
             notification = "Admin added successfully. The new admin has been notified."
         except Exception:
             notification = (
-                "Admin added successfully. Telegram may not let the bot message them yet; "
-                "send them the Open Hostify link so they can press Start."
+                "Admin added successfully. Telegram does not allow the bot to message them "
+                "until they start it. Send them the link below."
             )
-        await _reply(message, f"{notification}\nAdmin ID: {admin_id}")
+        await _reply(
+            message,
+            f"{notification}\nAdmin ID: {admin_id}",
+            InlineKeyboardMarkup([
+                [InlineKeyboardButton("Open Hostify", url=start_url)],
+                [InlineKeyboardButton("Close", callback_data="hostify:ui:close")],
+            ]),
+        )
     except Exception:
         logger.exception("Could not add admin ID %s", admin_id)
         await _reply(message, "Could not add this admin. Check the controller logs.")
