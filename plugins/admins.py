@@ -64,6 +64,8 @@ async def addadmin_input(client: Client, message):
             username = ""
             first_name = ""
         await add_admin(admin_id, username=username, first_name=first_name, added_by=owner.id)
+        from command_menu import sync_user_commands
+        await sync_user_commands(admin_id, "admin")
         _pending_add.pop(owner.id, None)
 
         bot_username = (await client.get_me()).username
@@ -146,6 +148,9 @@ async def removeadmin_callback(client: Client, query):
     admin_id = int((query.data or "").rsplit(":", 1)[-1])
     try:
         removed = await remove_admin(admin_id)
+        if removed:
+            from command_menu import sync_user_commands
+            await sync_user_commands(admin_id, None)
         if not removed:
             await query.answer("This admin is no longer registered.", show_alert=True)
             return
