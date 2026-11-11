@@ -31,10 +31,21 @@ class PluginImportTests(unittest.TestCase):
             "plugins.message_editor",
             "plugins.channel",
             "plugins.ui",
+            "command_menu",
         ]
+        imported = {}
         for module in modules:
             with self.subTest(module=module):
-                importlib.import_module(module)
+                imported[module] = importlib.import_module(module)
+
+        menu = imported["command_menu"]
+        self.assertEqual(
+            [item["command"] for item in menu.PUBLIC_COMMANDS],
+            ["start", "command", "admins", "ping"],
+        )
+        self.assertNotIn("help", [item["command"] for item in menu.PUBLIC_COMMANDS])
+        self.assertIn("deploy", [item["command"] for item in menu.ADMIN_COMMANDS])
+        self.assertIn("commands", [item["command"] for item in menu.OWNER_COMMANDS])
 
 
 if __name__ == "__main__":
