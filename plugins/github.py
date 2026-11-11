@@ -114,7 +114,7 @@ async def _send_or_edit(target, *, edit: bool = False):
     styled = sc(text)
     keyboard = _keyboard(ready)
     if edit:
-        return await target.edit_message_text(
+        return await target.edit_text(
             styled,
             reply_markup=keyboard,
             parse_mode=ParseMode.DISABLED,
