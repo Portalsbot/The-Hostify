@@ -98,6 +98,14 @@ async def addadmin_input(client: Client, message):
         await _reply(message, "Could not add this admin. Check the controller logs.")
 
 
+def cancel_admin_add(user_id: int, chat_id: int) -> bool:
+    """Clear a pending owner add-admin conversation."""
+    if _pending_add.get(user_id) != chat_id:
+        return False
+    _pending_add.pop(user_id, None)
+    return True
+
+
 @Client.on_message(filters.command("removeadmin") & filters.private)
 async def removeadmin_command(client: Client, message):
     user = message.from_user
