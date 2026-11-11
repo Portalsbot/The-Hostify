@@ -52,19 +52,11 @@ All controller commands are owner-only. Private GitHub repositories are not supp
 
 📣 Updates: {promo_channel_mention} | {promo_channel_url} (ID: {promo_channel_id})
 🛠 Developer: {developer_mention} (ID: {developer_id})\n💬 Support: {support_mention} (ID: {support_id})"""
-M07_ASK_REPO = """Step 1 of 3
-
-Send a public GitHub repository URL to deploy.
-Private repositories are not supported. Never include access tokens in a URL."""
-M08_INVALID_URL = "That is not a valid public GitHub repository URL. Send it again, or /cancel to abort."
+M07_ASK_REPO = "Send me the repo URL to deploy."
+M08_INVALID_URL = "That is not a valid GitHub repository URL. Send it again, or /cancel to abort."
 M09_ASK_NAME = "Send me a deployment name."
 M10_INVALID_NAME = "That name is invalid or already in use. Send a different name, or /cancel to abort."
-M11_ASK_ENV = """Step 3 of 3
-
-Send environment variables as KEY=VALUE, one per line.
-Send skip if none. Never send Hostify controller credentials.
-
-Optional: NOTIFY_CHANNEL=@your_channel (the bot must be an admin there)."""
+M11_ASK_ENV = "Send environment variables as KEY=VALUE, one per line, or send skip."
 M12_DEPLOYING = "Deploying {name}…\n\nCloning the repository, installing dependencies and starting the process."
 M13_DEPLOY_OK = "Deployment successful.\n\nBot: {name}\nPID: {pid}\nStatus: running\n\nUse /list or /logs {name} to manage it."
 M14_DEPLOY_FAIL = "Deployment failed for {name}.\n\nReason: {reason}\n\nInspect the server deployment log before retrying."
