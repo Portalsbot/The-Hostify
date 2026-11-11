@@ -16,6 +16,8 @@ _client = AsyncMongoClient(
 )
 _db = _client.hostify
 _bots = _db.deployed_bots
+_admins = _db.admins
+_users = _db.users
 _settings = _db.app_settings
 _UNSET = object()
 _MESSAGE_KEY = re.compile(r"^M\d{2,3}_[A-Z0-9_]{1,64}$")
@@ -69,6 +71,7 @@ async def add_bot(
     repo_url: str,
     env_vars: dict[str, str] | None = None,
     notify_channel: str | None = None,
+    deployed_by: int | None = None,
 ) -> None:
     """Insert or refresh a bot record; environment secrets are encrypted at rest."""
     now = datetime.now(timezone.utc)
@@ -81,6 +84,7 @@ async def add_bot(
                 "repo_url": repo_url,
                 "env_vars": encrypted_env,
                 "notify_channel": notify_channel,
+                "deployed_by": int(deployed_by) if deployed_by else None,
                 "status": "stopped",
                 "pid": None,
                 "pid_created_at": None,
@@ -97,13 +101,75 @@ async def get_bot(name: str) -> dict[str, Any] | None:
     return _decode_bot(await _bots.find_one({"name": name}))
 
 
-async def list_bots(limit: int = 1_000) -> list[dict[str, Any]]:
+async def list_bots(limit: int = 1_000, deployed_by: int | None = None) -> list[dict[str, Any]]:
     """Return a bounded result set to avoid unbounded memory growth."""
     if not isinstance(limit, int) or not 1 <= limit <= 10_000:
         raise ValueError("Bot listing limit must be between 1 and 10000.")
-    cursor = _bots.find({}).sort("name", 1).limit(limit)
+    query = {"deployed_by": int(deployed_by)} if deployed_by is not None else {}
+    cursor = _bots.find(query).sort("name", 1).limit(limit)
     documents = await cursor.to_list(length=limit)
     return [_decode_bot(document) for document in documents]
+
+
+async def update_bot_env(name: str, env_vars: dict[str, str]) -> None:
+    """Persist encrypted deployment environment values."""
+    await _bots.update_one(
+        {"name": name},
+        {"$set": {
+            "env_vars": encrypt_env_vars(env_vars),
+            "updated_at": datetime.now(timezone.utc),
+        }},
+    )
+
+
+async def add_admin(user_id: int, *, username: str = "", first_name: str = "", added_by: int | None = None) -> None:
+    if not isinstance(user_id, int) or user_id <= 0:
+        raise ValueError("Admin ID must be a positive Telegram user ID.")
+    await _admins.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "user_id": user_id,
+            "username": str(username)[:64],
+            "first_name": str(first_name)[:128],
+            "added_by": added_by,
+            "updated_at": datetime.now(timezone.utc),
+        }, "$setOnInsert": {"created_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+
+async def remove_admin(user_id: int) -> bool:
+    result = await _admins.delete_one({"user_id": int(user_id)})
+    return bool(result.deleted_count)
+
+
+async def is_admin(user_id: int | None) -> bool:
+    if not isinstance(user_id, int) or user_id <= 0:
+        return False
+    return await _admins.find_one({"user_id": user_id}, {"_id": 1}) is not None
+
+
+async def get_admins() -> list[dict[str, Any]]:
+    return await _admins.find({}).sort("first_name", 1).to_list(length=500)
+
+
+async def register_user(user_id: int, *, username: str = "", first_name: str = "") -> None:
+    if not isinstance(user_id, int) or user_id <= 0:
+        return
+    await _users.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "user_id": user_id,
+            "username": str(username)[:64],
+            "first_name": str(first_name)[:128],
+            "last_seen": datetime.now(timezone.utc),
+        }, "$setOnInsert": {"created_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+
+async def get_registered_users() -> list[dict[str, Any]]:
+    return await _users.find({}, {"user_id": 1, "username": 1, "first_name": 1}).to_list(length=20_000)
 
 
 async def update_status(
