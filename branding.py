@@ -6,7 +6,13 @@ import re
 from database import get_app_settings, set_app_setting
 
 DEFAULT_BRANDING: dict[str, str] = {
-    "brand_name": "The Hostify",
+    "brand_name": "Hostify 2",
+    "owner_username": "reactiveHCL",
+    "bot_channel_name": "AceXbotz",
+    "bot_channel_url": "https://t.me/+txI4WlZlwdg0NWY9",
+    "language": "Python 3.13",
+    "library": "Pyrofork (Pyrogram API)",
+    "database": "MongoDB (Async PyMongo)",
     "developer_username": "reactiveHCL",
     "developer_id": "8043083450",
     "support_username": "Just_Astha",
@@ -43,7 +49,7 @@ def _validate_brand_value(field: str, value: str) -> str:
         value = value.removeprefix("@").strip()
         if not _USERNAME_RE.fullmatch(value):
             raise ValueError("Enter a valid Telegram username without @ (5-32 letters, digits or underscores).")
-    elif field.endswith("_id"):
+    elif field.endswith("_url"):\n        if not value.startswith(("https://t.me/", "https://")):\n            raise ValueError("Enter a valid HTTPS URL.")\n    elif field.endswith("_id"):
         if not re.fullmatch(r"-?\d{5,20}", value):
             raise ValueError("Enter a numeric Telegram ID.")
     return value
