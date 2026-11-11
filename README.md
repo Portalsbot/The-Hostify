@@ -1,107 +1,120 @@
 # The Hostify
 
-The Hostify is a Telegram-controlled Python bot deployment manager. The controller can clone **public GitHub repositories**, install their `requirements.txt`, start a bot process, store deployment metadata in MongoDB, and manage running processes.
+The Hostify is a Telegram-controlled Python bot deployment manager. The repository can run directly with Python or as a Docker container.
 
-> **Security / hosting limitation:** This version does not run customer code inside Docker or another OS sandbox. Customer processes run on the same host as the controller. Deployment is therefore disabled by default. Do not offer this build as public multi-tenant hosting or deploy repositories you do not personally trust. Enabling `ALLOW_UNSANDBOXED_DEPLOYMENTS=true` is an explicit risk acceptance, not a sandbox.
+> Important: the Dockerfile packages the Hostify controller itself. The current customer deployment engine still runs Python projects as child processes; it does not build or manage separate customer Docker containers. Private GitHub repositories are not supported in this version.
 
-## Features
+## Run The Hostify controller in Docker
+
+1. Copy .env.example to .env and fill in API_ID, API_HASH, BOT_TOKEN, OWNER_ID, MONGO_URI and DATA_ENCRYPTION_KEY.
+2. Generate the Fernet key with:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+3. Install Docker Engine and Docker Compose, then run:
+
+```bash
+docker compose up -d --build
+```
+
+4. Inspect the service:
+
+```bash
+docker compose logs -f hostify
+docker compose ps
+```
+
+5. Open http://YOUR_SERVER_IP:10000/health. The endpoint returns status=ok after the Telegram controller connects.
+
+The Compose definition stores the Pyrogram session in a persistent named volume at /data and deployed bot files in a second volume at /var/lib/hostify_bots. The controller runs as a non-root user, with a read-only root filesystem, dropped capabilities, no-new-privileges and a health check.
+
+### Build and run manually
+
+```bash
+docker build -t the-hostify:latest .
+docker volume create hostify-controller-data
+docker volume create hostify-bots-data
+docker run -d --name the-hostify --restart unless-stopped \
+  --env-file .env -e PORT=10000 -e SESSION_DIR=/data \
+  -e BASE_DIR=/var/lib/hostify_bots -p 10000:10000 \
+  -v hostify-controller-data:/data \
+  -v hostify-bots-data:/var/lib/hostify_bots \
+  the-hostify:latest
+```
+
+## Run directly with Python
+
+Use Python 3.13 on Linux with Git installed.
+
+```bash
+python -m pip install -r requirements.txt
+python main.py
+```
+
+Set SESSION_DIR=./data and BASE_DIR to a persistent writable directory for a native installation.
+
+## Render deployment
+
+For a Render Python Web Service:
+
+- Build command: pip install -r requirements.txt
+- Start command: python main.py
+- Health check path: /health
+
+Add the variables from .env.example in Render Environment settings. Render Free Web Services may sleep and use ephemeral local storage; they are not a guarantee that child bot processes and their files will survive restarts or redeploys.
+
+## Current features
 
 - Telegram owner-only deployment and management commands.
-- Public GitHub repository deployment (private repositories are not supported).
-- Process start, stop, restart, delete, log-tail and resource-status commands.
-- Process identity checks to reduce accidental signalling of an unrelated process.
-- Periodic watchdog recovery for recorded running bots.
-- Optional `NOTIFY_CHANNEL` announcements with Restart / Stop / Delete controls.
-- Double-confirmed deletion with an expiring, user/chat/message-bound confirmation token.
-- MongoDB-backed branding and message overrides edited from Telegram, using MongoDB’s native asynchronous PyMongo client.
-- Small-cap styling on controller messages while preserving Telegram commands, usernames, URLs and environment-variable keys.
+- Public GitHub repository deployment; private repositories are not supported.
+- Python bot deployment using requirements.txt and an entry point.
+- Start, stop, restart, delete, logs, resource status and watchdog recovery.
 - Encrypted environment-variable storage using Fernet.
-- HTTP health endpoints at `/` and `/health` for PaaS health checks.
-
-## Setup
-
-Use Python 3.13 on a persistent Linux host. The repository includes `.python-version` so Render uses a compatible, reproducible runtime. The host must have `git` installed. Running many bots requires enough RAM, CPU, disk and process capacity; this software cannot make a free hosting plan support 100+ persistent bot processes.
-
-1. Clone or upload this repository.
-2. Install dependencies:
-
-   ```bash
-   python -m pip install -r requirements.txt
-   ```
-
-3. Copy `.env.example` to `.env` and set `API_ID`, `API_HASH`, `BOT_TOKEN`, `OWNER_ID`, and `MONGO_URI`. On Render, use build command `pip install -r requirements.txt` and start command `python main.py`; add every setting from `.env.example` as a Render environment variable (do not upload the `.env` file).
-4. Generate `DATA_ENCRYPTION_KEY` once:
-
-   ```bash
-   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-   ```
-
-   Store this value in your host's secret environment variables. Back it up securely. If it is lost, encrypted customer bot environment values cannot be decrypted.
-5. Keep `ALLOW_UNSANDBOXED_DEPLOYMENTS=false` until you understand and accept the shared-host execution risk. To enable deployment of repositories you personally trust, set it to `true` in the service environment and redeploy.
-6. Start the controller:
-
-   ```bash
-   python main.py
-   ```
-
-The health server listens on `0.0.0.0:$PORT` (`10000` by default). MongoDB must be reachable from the host. Use a persistent disk for `BASE_DIR`; ephemeral storage may be lost on redeploy/restart.
+- MongoDB-backed branding and editable message templates.
+- HTTP health endpoints at / and /health.
+- Dockerfile and Compose packaging for the Hostify controller.
 
 ## Telegram commands
 
 | Command | Purpose |
 |---|---|
-| `/start` | Welcome message and branding |
-| `/help` | Command reference |
-| `/deploy` | Start the public-repository deployment flow |
-| `/cancel` | Cancel a deployment setup before process launch |
-| `/list` | List deployed bots and status |
-| `/stop <name>` | Stop a bot |
-| `/restart <name>` | Restart a bot |
-| `/delete <name>` | Request deletion; confirm with the inline button |
-| `/logs <name>` | Show the latest 20 log lines |
-| `/status` | Show host CPU, RAM, disk and tracked bot counts |
-| `/ping` | Owner-only Telegram update check |
-| `/settings` | Show editable branding and message controls |
-| `/setbrand <field> <value>` | Change one branding field |
-| `/messages` | List editable message-template keys |
-| `/setmsg <KEY> <text>` | Save a custom message in MongoDB |
-| `/resetmsg <KEY>` | Restore the built-in message for a key |
+| /start | Welcome message and branding |
+| /help | Command reference |
+| /deploy | Start the public-repository deployment flow |
+| /cancel | Cancel deployment setup |
+| /list | List deployed bots and status |
+| /stop NAME | Stop a bot |
+| /restart NAME | Restart a bot |
+| /delete NAME | Request deletion; confirm with the inline button |
+| /logs NAME | Show the latest 20 log lines |
+| /status | Show host CPU, RAM, disk and tracked bot counts |
+| /ping | Owner-only Telegram update check |
+| /settings | Show editable branding and message controls |
+| /setbrand FIELD VALUE | Change a branding field |
+| /messages | List editable message-template keys |
+| /setmsg KEY TEXT | Save a custom message in MongoDB |
+| /resetmsg KEY | Restore the built-in message for a key |
 
-### Telegram-editable branding
+## Editable branding and messages
 
-The default public identity is:
+The owner can use /setbrand FIELD VALUE to update brand_name, developer_username, developer_id, support_username, support_id, promo_channel_username or promo_channel_id.
 
-- Developer: `@reactiveHCL` — `8043083450`
-- Support: `@Just_Astha` — `7271115259`
-- Promotion channel: `@Anime_Portals` — `-1003545564222` (https://t.me/Anime_Portals)
+Use /messages to list editable message keys. Use /setmsg KEY TEXT to save a custom template and /resetmsg KEY to restore its built-in default. Keep dynamic placeholders such as {name}, {pid}, {developer_id} and {promo_channel_url} when needed. Changes are stored in MongoDB. OWNER_ID remains an environment setting to prevent owner lockout.
 
-Use `/setbrand <field> <value>` to update `brand_name`, `developer_username`, `developer_id`, `support_username`, `support_id`, `promo_channel_username` or `promo_channel_id`. The numeric controller access ID in `OWNER_ID` is intentionally not editable from Telegram, to avoid locking the owner out.
+## Security and limitations
 
-Use `/messages` to list the available template IDs. For example:
-
-```text
-/setmsg M03_OWNER_WELCOME Welcome to {brand_name}. Follow {promo_channel_mention}.
-```
-
-Keep placeholders used by a message's dynamic fields (such as `{name}`, `{pid}`, `{developer_id}` or `{promo_channel_url}`) when those values are needed. Message changes are stored in MongoDB and survive controller restarts.
-
-### Channel announcements
-
-To post deployment announcements, include `NOTIFY_CHANNEL=@your_channel` in the deployment environment. The deployed bot/controller must be an administrator with permission to post in that channel. This is separate from the Hostify promotion channel configured under `/settings`.
-
-## Important limitations
-
-- Only public GitHub repositories are supported. Never paste a GitHub token into a URL.
-- There is no Docker/container isolation, CPU quota, memory limit or per-customer operating-system account in this build.
-- The database layer uses PyMongo Async (`AsyncMongoClient`), not the deprecated Motor driver.
-- A customer repository can execute arbitrary code with the controller service account's operating-system permissions. The child process receives a reduced environment, but this is not a security boundary.
-- Render/free PaaS plans may not support persistent child processes or persistent storage. A green health check does not guarantee that spawned bots will remain alive.
-- “100+ bots for free” cannot be guaranteed. Capacity depends on the host's actual CPU, RAM, disk I/O, network and provider terms.
-- Test with one repository you own before exposing the service to others or taking payments.
+- The controller Docker image is not a customer-container deployment engine.
+- Customer Python processes currently run under the Hostify service account. There is no per-customer container or OS sandbox in this version.
+- ALLOW_UNSANDBOXED_DEPLOYMENTS=false is the default. Enabling it is an explicit risk acceptance, not a security boundary.
+- Do not deploy untrusted repositories or offer public multi-tenant hosting with this version.
+- The current deployment flow accepts public GitHub repositories only. Never put access tokens in repository URLs.
+- Docker packaging does not make Render Free a 24/7 host. Use persistent hosting and storage for continuous operation.
+- Capacity depends on the host's actual CPU, RAM, disk, network and provider limits; no fixed bot count is guaranteed.
 
 ## Health check
 
-- `GET /` — service health JSON
-- `GET /health` — same health response
-
-The endpoint reports `starting` until the Telegram client is connected; it reports `ok` after successful startup.
+- GET / — service health JSON
+- GET /health — same health response
+- Status is starting until the Telegram client connects, then ok.
