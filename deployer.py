@@ -336,12 +336,12 @@ async def deploy_bot(
                     ))
                     askpass = askpass_dir / "askpass.sh"
                     askpass.write_text(
-                        "#!/bin/sh\\n"
-                        "case \"$1\" in\\n"
-                        "  *Username*) printf '%s\\n' 'x-access-token' ;;\\n"
-                        "  *Password*) printf '%s\\n' \"$HOSTIFY_GITHUB_TOKEN\" ;;\\n"
-                        "  *) exit 1 ;;\\n"
-                        "esac\\n",
+                        "#!/bin/sh\n"
+                        "case \"$1\" in\n"
+                        "  *Username*) printf '%s\n' 'x-access-token' ;;\n"
+                        "  *Password*) printf '%s\n' \"$HOSTIFY_GITHUB_TOKEN\" ;;\n"
+                        "  *) exit 1 ;;\n"
+                        "esac\n",
                         encoding="utf-8",
                     )
                     askpass.chmod(0o700)
