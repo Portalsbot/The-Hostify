@@ -2,7 +2,7 @@
 
 The Hostify is a Telegram-controlled Python bot deployment manager. The repository can run directly with Python or as a Docker container.
 
-> Important: the Dockerfile packages the Hostify controller itself. The current customer deployment engine still runs Python projects as child processes; it does not build or manage separate customer Docker containers. Private GitHub repositories are not supported in this version.
+> Important: the Dockerfile packages the Hostify controller itself. The current customer deployment engine still runs Python projects as child processes; it does not build or manage separate customer Docker containers. GitHub App support can access selected private repositories, but deployment execution remains disabled by default until you explicitly accept the current unsandboxed execution risk.
 
 ## Run The Hostify controller in Docker
 
@@ -63,12 +63,13 @@ For a Render Python Web Service:
 - Start command: python main.py
 - Health check path: /health
 
-Add the variables from .env.example in Render Environment settings. Render Free Web Services may sleep and use ephemeral local storage; they are not a guarantee that child bot processes and their files will survive restarts or redeploys.
+Add the variables from .env.example in Render Environment settings. For GitHub App access, also set GITHUB_APP_ID, GITHUB_APP_SLUG and GITHUB_APP_PRIVATE_KEY_B64. Encode the downloaded GitHub App .pem file as Base64 before placing it in the Render secret value. Never commit the private key or send it through Telegram. Render Free Web Services may sleep and use ephemeral local storage; they are not a guarantee that child bot processes and their files will survive restarts or redeploys.
 
 ## Current features
 
 - Telegram owner-only deployment and management commands.
-- Public GitHub repository deployment; private repositories are not supported.
+- GitHub App authentication and listing of installed repositories.
+- Public GitHub repository cloning and selected private repository cloning through short-lived GitHub App installation tokens.
 - Python bot deployment using requirements.txt and an entry point.
 - Start, stop, restart, delete, logs, resource status and watchdog recovery.
 - Encrypted environment-variable storage using Fernet.
@@ -82,7 +83,7 @@ Add the variables from .env.example in Render Environment settings. Render Free 
 |---|---|
 | /start | Welcome message and branding |
 | /help | Command reference |
-| /deploy | Start the public-repository deployment flow |
+| /deploy | Start the public or GitHub-App-authorised repository deployment flow |
 | /cancel | Cancel deployment setup |
 | /list | List deployed bots and status |
 | /stop NAME | Stop a bot |
@@ -91,6 +92,7 @@ Add the variables from .env.example in Render Environment settings. Render Free 
 | /logs NAME | Show the latest 20 log lines |
 | /status | Show host CPU, RAM, disk and tracked bot counts |
 | /ping | Owner-only Telegram update check |
+| /github | Check GitHub App connection and list accessible repositories |
 | /settings | Show editable branding and message controls |
 | /setbrand FIELD VALUE | Change a branding field |
 | /messages | List editable message-template keys |
@@ -109,7 +111,7 @@ Use /messages to list editable message keys. Use /setmsg KEY TEXT to save a cust
 - Customer Python processes currently run under the Hostify service account. There is no per-customer container or OS sandbox in this version.
 - ALLOW_UNSANDBOXED_DEPLOYMENTS=false is the default. Enabling it is an explicit risk acceptance, not a security boundary.
 - Do not deploy untrusted repositories or offer public multi-tenant hosting with this version.
-- The current deployment flow accepts public GitHub repositories only. Never put access tokens in repository URLs.
+- The deployment flow can use public repositories anonymously or selected private repositories through the installed GitHub App. Installation tokens are short-lived and are not stored in the database or inserted into repository URLs. Never put access tokens in repository URLs.
 - Docker packaging does not make Render Free a 24/7 host. Use persistent hosting and storage for continuous operation.
 - Capacity depends on the host's actual CPU, RAM, disk, network and provider limits; no fixed bot count is guaranteed.
 
