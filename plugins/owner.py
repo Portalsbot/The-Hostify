@@ -281,8 +281,16 @@ async def settings_callback(client: Client, query):
         await query.answer("Owner access required.", show_alert=True)
         return
     action = (query.data or "").rsplit(":", 1)[-1]
+    if action == "root":
+        await query.message.edit_text(
+            format_output("Hostify settings\\n\\nManage branding, editable messages, administrators, GitHub access, deployment policy and host status."),
+            parse_mode=ParseMode.DISABLED,
+            reply_markup=_settings_keyboard(),
+        )
+        await query.answer()
+        return
     screens = {
-        "branding": "Branding fields: brand_name, owner_username, developer_username, developer_id, support_username, support_id, promo_channel_username, promo_channel_id, bot_channel_name, bot_channel_url, language, library, database.\n\nUse /setbrand FIELD VALUE.",
+        "branding": "Branding fields: brand_name, owner_username, developer_username, developer_id, support_username, support_id, promo_channel_username, promo_channel_id, bot_channel_name, bot_channel_url, language, library, database.\\n\\nUse /setbrand FIELD VALUE.",
         "messages": "Use /messageonly to browse and edit every message template.",
         "admins": "Use /addadmin to add an admin, /removeadmin to remove one, and /admins to view the team.",
         "github": "Use /github to inspect the GitHub App connection and accessible repositories.",
