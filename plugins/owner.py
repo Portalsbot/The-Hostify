@@ -26,6 +26,7 @@ _NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{1,32}$")
 _DELETE_PATTERN = re.compile(r"^hostify:delete:(confirm|cancel):([A-Za-z0-9_-]{12})$")
 _DELETE_CONFIRM_TTL = 60
 _PENDING_DELETES: dict[str, tuple[int, int, str, float, int]] = {}
+_BRAND_EDIT_SESSIONS: dict[int, tuple[int, int, str]] = {}
 
 def _close_markup():
     return InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]])
@@ -270,6 +271,95 @@ async def settings_handler(client: Client, message):
         ]),
     )
 
+def _branding_fields_keyboard():
+    branding = get_branding()
+    rows = []
+    row = []
+    for field in sorted(branding):
+        row.append(InlineKeyboardButton(
+            field.replace("_", " ").title(),
+            callback_data=f"hostify:brand:edit:{field}",
+        ))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([
+        InlineKeyboardButton("Back", callback_data="hostify:settings:root"),
+        InlineKeyboardButton("Close", callback_data="hostify:ui:close"),
+    ])
+    return InlineKeyboardMarkup(rows)
+
+
+@Client.on_callback_query(filters.regex(r"^hostify:brand:edit:"))
+async def branding_edit_callback(client: Client, query):
+    user = query.from_user
+    if not user or not is_owner(user.id) or query.message is None:
+        await query.answer("Owner access required.", show_alert=True)
+        return
+    field = (query.data or "").split(":", 3)[-1]
+    branding = get_branding()
+    if field not in branding:
+        await query.answer("Unknown branding field.", show_alert=True)
+        return
+    _BRAND_EDIT_SESSIONS[user.id] = (query.message.chat.id, query.message.id, field)
+    await query.message.edit_text(
+        format_output(
+            f"Send me the new value for {field}.\\n\\n"
+            f"Current value: {branding[field]}\\n\\n"
+            "Send /cancel to leave this editor."
+        ),
+        parse_mode=ParseMode.DISABLED,
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("Back", callback_data="hostify:settings:branding"),
+            InlineKeyboardButton("Close", callback_data="hostify:ui:close"),
+        ]]),
+    )
+    await query.answer()
+
+
+@Client.on_message(
+    filters.private & filters.text & ~filters.regex(r"^/"),
+    group=7,
+)
+async def branding_edit_input(client: Client, message):
+    user = message.from_user
+    if not user or not is_owner(user.id):
+        return
+    pending = _BRAND_EDIT_SESSIONS.get(user.id)
+    if pending is None or pending[0] != message.chat.id:
+        return
+    chat_id, message_id, field = pending
+    try:
+        value = await set_brand_value(field, message.text or "")
+        _BRAND_EDIT_SESSIONS.pop(user.id, None)
+        await client.edit_message_text(
+            chat_id,
+            message_id,
+            format_output(f"Updated {field} successfully.\\n\\nNew value: {value}"),
+            parse_mode=ParseMode.DISABLED,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("Back", callback_data="hostify:settings:branding"),
+                InlineKeyboardButton("Close", callback_data="hostify:ui:close"),
+            ]]),
+        )
+    except ValueError as exc:
+        await _reply(message, f"Invalid value: {exc}")
+    except Exception:
+        logger.exception("Could not update branding field %s", field)
+        _BRAND_EDIT_SESSIONS.pop(user.id, None)
+        await _reply(message, "Could not update branding. Check controller logs.")
+
+
+def cancel_brand_edit(user_id: int, chat_id: int) -> bool:
+    pending = _BRAND_EDIT_SESSIONS.get(user_id)
+    if pending is None or pending[0] != chat_id:
+        return False
+    _BRAND_EDIT_SESSIONS.pop(user_id, None)
+    return True
+
+
 @Client.on_callback_query(filters.regex(r"^hostify:settings:"))
 async def settings_callback(client: Client, query):
     user = query.from_user
@@ -285,8 +375,16 @@ async def settings_callback(client: Client, query):
         )
         await query.answer()
         return
+    if action == "branding":
+        await query.message.edit_text(
+            format_output("Choose the branding field you want to edit."),
+            parse_mode=ParseMode.DISABLED,
+            reply_markup=_branding_fields_keyboard(),
+        )
+        await query.answer()
+        return
     screens = {
-        "branding": "Branding fields: brand_name, owner_username, developer_username, developer_id, support_username, support_id, promo_channel_username, promo_channel_id, bot_channel_name, bot_channel_url, language, library, database.\\n\\nUse /setbrand FIELD VALUE.",
+        "branding": "Choose a branding field to edit.",
         "messages": "Use /messageonly to browse and edit every message template.",
         "admins": "Use /addadmin to add an admin, /removeadmin to remove one, and /admins to view the team.",
         "github": "Use /github to inspect the GitHub App connection and accessible repositories.",
