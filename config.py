@@ -13,12 +13,15 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OWNER_ID = int(os.getenv("OWNER_ID", "8043083450"))
 MONGO_URI = os.getenv("MONGO_URI", "").strip()
 BASE_DIR = str(Path(os.path.expanduser(os.getenv("BASE_DIR", "~/hostify_bots"))).resolve())
+SESSION_DIR = Path(os.path.expanduser(os.getenv("SESSION_DIR", "./data"))).resolve()
+PORT = int(os.getenv("PORT", "10000"))
 ALLOW_UNSANDBOXED_DEPLOYMENTS = (
     os.getenv("ALLOW_UNSANDBOXED_DEPLOYMENTS", "false").strip().lower()
     in {"1", "true", "yes", "on"}
 )
 
 Path(BASE_DIR).mkdir(parents=True, exist_ok=True)
+SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
 if not MONGO_URI:
     raise RuntimeError("MONGO_URI is required; refusing to start without a database URI.")
