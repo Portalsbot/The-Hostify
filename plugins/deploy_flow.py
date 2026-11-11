@@ -178,7 +178,7 @@ async def deploy_input_handler(client: Client, message):
 
             session.stage = "name"
             session.created_at = time.monotonic()
-            await _reply(message, M.M09_ASK_NAME)
+            await _reply(message, M.M09_ASK_NAME, plain=True)
             return
 
         if session.stage == "name":
@@ -197,7 +197,7 @@ async def deploy_input_handler(client: Client, message):
             session.name = name
             session.stage = "environment"
             session.created_at = time.monotonic()
-            await _reply(message, M.M11_ASK_ENV)
+            await _reply(message, M.M11_ASK_ENV, plain=True)
             return
 
         if session.stage != "environment":
