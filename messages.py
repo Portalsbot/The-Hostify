@@ -57,7 +57,7 @@ M07_ASK_REPO = """Step 1 of 3
 Send a public GitHub repository URL to deploy.
 Private repositories are not supported. Never include access tokens in a URL."""
 M08_INVALID_URL = "That is not a valid public GitHub repository URL. Send it again, or /cancel to abort."
-M09_ASK_NAME = "Step 2 of 3\n\nSend a short bot name. Use 1-32 letters, numbers or underscores. Example: customer_alice"
+M09_ASK_NAME = "Send me a deployment name."
 M10_INVALID_NAME = "That name is invalid or already in use. Send a different name, or /cancel to abort."
 M11_ASK_ENV = """Step 3 of 3
 
@@ -105,7 +105,7 @@ M31_DM_STOPPED = "⏹ {bot_mention} has been stopped successfully."
 M31_DM_DELETED = "🗑 {bot_mention} has been deleted successfully."
 M32_WATCHDOG_RESTARTED = "Watchdog check — {time}\n\n🔄 Restarted: {restarted}"
 M32_WATCHDOG_FAIL = "Watchdog check — {time}\n\n❌ Still down: {failed}"
-M33_CANCELLED = "Cancelled."
+M33_CANCELLED = "Deployment cancelled successfully!"
 M34_NAME_TAKEN = "That name is already deployed. Pick another name, or /cancel."
 M35_SETTINGS = """{brand_name} settings
 
@@ -149,7 +149,7 @@ M72_DELETE_FAILED = "Deletion failed. Check controller logs."
 M73_UNKNOWN_CONTROL = "Unknown or expired Hostify control."
 M74_NO_DEPLOY_ACCESS = "Deployments are disabled by default. Set ALLOW_UNSANDBOXED_DEPLOYMENTS=true only for repositories you personally trust."
 M75_DEPLOY_TRUST_WARNING = "Security warning: this controller executes customer code on the same host without container sandboxing. Do not use it for untrusted public customer repositories."
-M76_UNKNOWN_COMMAND = "Unknown command. Send /help to view the available commands."
+M76_UNKNOWN_COMMAND = "Unknown command. Send /command to view available commands."
 
 
 M77_START_ERROR = "Hostify could not process this request."
