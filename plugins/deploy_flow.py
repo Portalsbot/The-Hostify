@@ -15,7 +15,7 @@ import messages as M
 from database import get_bot
 from deployer import deploy_bot, _validate_env_vars, _validate_name, _validate_repo_url
 from github_app import GitHubAppError, get_installation_token_for_repository
-from .guard import owner_only
+from .guard import is_owner_or_admin
 from .channel import post_deploy_announcement
 
 logger = logging.getLogger("hostify.plugins.deploy_flow")
@@ -88,10 +88,13 @@ def _get_valid_session(user_id: int, chat_id: int) -> DeploySession | None:
     return session
 
 
-@Client.on_message(filters.command("deploy") & filters.private & owner_only)
+@Client.on_message(filters.command("deploy") & filters.private)
 async def deploy_command(client: Client, message):
     user = message.from_user
     if user is None:
+        return
+    if not await is_owner_or_admin(user.id):
+        await _reply(message, "Deployment access is restricted to the owner and approved admins.")
         return
     if not ALLOW_UNSANDBOXED_DEPLOYMENTS:
         await _reply(message, f"{M.M74_NO_DEPLOY_ACCESS}\n\n{M.M75_DEPLOY_TRUST_WARNING}")
@@ -118,10 +121,10 @@ async def deploy_command(client: Client, message):
     await _reply(message, M.M07_ASK_REPO)
 
 
-@Client.on_message(filters.command("cancel") & filters.private & owner_only)
+@Client.on_message(filters.command("cancel") & filters.private)
 async def cancel_deploy(client: Client, message):
     user = message.from_user
-    if user is None:
+    if user is None or not await is_owner_or_admin(user.id):
         return
 
     async with _session_lock:
@@ -144,13 +147,12 @@ async def cancel_deploy(client: Client, message):
 
 @Client.on_message(
     filters.private
-    & owner_only
     & filters.text
     & ~filters.regex(r"^/")
 )
 async def deploy_input_handler(client: Client, message):
     user = message.from_user
-    if user is None or not message.text:
+    if user is None or not message.text or not await is_owner_or_admin(user.id):
         return
 
     # Keep each state transition atomic. Never hold the lock while installing
@@ -225,7 +227,11 @@ async def deploy_input_handler(client: Client, message):
             await _reply(message, M.M14_DEPLOY_FAIL.format(name=name, reason=str(exc)[:_MAX_DETAIL_CHARS]))
             return
 
-        success, detail = await deploy_bot(name, repo_url, env_vars, github_token=github_token)
+        success, detail = await deploy_bot(
+            name, repo_url, env_vars,
+            github_token=github_token,
+            deployed_by=user.id,
+        )
 
         if success:
             # Channel notifications are best-effort. A database or Telegram
