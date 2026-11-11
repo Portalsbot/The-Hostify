@@ -5,6 +5,8 @@ import logging
 import time
 from datetime import datetime
 
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
 import psutil
 
 from config import OWNER_ID
@@ -84,7 +86,7 @@ async def watchdog_loop(client) -> None:
                         time=now,
                         restarted=", ".join(restarted),
                     )
-                    await send_message(client, OWNER_ID, text)
+                    await send_message(client, OWNER_ID, text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]))
                 if failed:
                     text = M.M32_WATCHDOG_FAIL.format(
                         time=now,
