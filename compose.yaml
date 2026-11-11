@@ -1,0 +1,40 @@
+services:
+  hostify:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: the-hostify:latest
+    container_name: the-hostify
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "10000"
+      SESSION_DIR: /data
+      BASE_DIR: /var/lib/hostify_bots
+    ports:
+      - "${HOSTIFY_PORT:-10000}:10000"
+    volumes:
+      - hostify_controller_data:/data
+      - hostify_bots_data:/var/lib/hostify_bots
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    mem_limit: 1g
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "python", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+
+volumes:
+  hostify_controller_data:
+  hostify_bots_data:
