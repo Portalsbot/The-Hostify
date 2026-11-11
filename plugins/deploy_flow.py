@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from config import ALLOW_UNSANDBOXED_DEPLOYMENTS
 from utils import format_output
@@ -39,12 +40,14 @@ _sessions: dict[int, DeploySession] = {}
 _session_lock = asyncio.Lock()
 
 
-async def _reply(message, text: str):
+async def _reply(message, text: str, *, plain: bool = False):
     return await message.reply_text(
-        format_output(text),
+        text if plain else format_output(text),
         parse_mode=ParseMode.DISABLED,
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("Close", callback_data="hostify:ui:close")
+        ]]),
     )
-
 
 def _validate_github_url(value: str) -> str:
     """Use the exact GitHub URL validator used by the deployment backend."""
@@ -118,7 +121,7 @@ async def deploy_command(client: Client, message):
             created_at=time.monotonic(),
         )
 
-    await _reply(message, M.M07_ASK_REPO)
+    await _reply(message, M.M07_ASK_REPO, plain=True)
 
 
 @Client.on_message(filters.command("cancel") & filters.private)
@@ -142,7 +145,7 @@ async def cancel_deploy(client: Client, message):
 
         _sessions.pop(user.id, None)
 
-    await _reply(message, M.M33_CANCELLED)
+    await _reply(message, M.M116_DEPLOY_CANCELLED)
 
 
 @Client.on_message(
