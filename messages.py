@@ -169,7 +169,7 @@ M111_DELETE_OPERATION_FAILED = "Could not delete {name}: {reason}"
 
 M112_START_DESCRIPTION = "I am a private hosting bot designed to make bot deployment and management simple, fast, and reliable. You can host multiple bots directly through me with an easy interface, automated updates, logging, and real-time system monitoring."
 M113_ABOUT_MESSAGE = "<blockquote>WELCOME TO THE HOSTIFY.</blockquote>\n\n<blockquote>YOUR PRIVATE TELEGRAM BOT HOSTING CONTROLLER IS ONLINE.</blockquote>"
-M114_HELP_MESSAGE = "<blockquote>AVAILABLE COMMANDS:\\n/start\\n/command\\n/admins\\n/ping\\n\\nIf you need help, contact admin <a href='https://t.me/Just_astha'>Astha</a>.</blockquote>"
+M114_HELP_MESSAGE = "<blockquote>AVAILABLE COMMANDS:\n/start\n/command\n/admins\n/ping\n\nIf you need help, contact admin <a href='https://t.me/Just_astha'>Astha</a>.</blockquote>"
 M115_CHANNEL_MESSAGE = "<blockquote>╭───────────────⍟\n├➽ DEVELOPER: <a href='https://t.me/Just_astha'>JUST ASTHA</a>\n├➽ OWNER: <a href='https://t.me/reactivehcl'>HCL</a>\n├➽ ANIME INDEX: <a href='https://t.me/master_index'>MASTER INDEX</a>\n├➽ FINISHED ANIME: <a href='https://t.me/Anime_portals'>ANIME PORTALS</a>\n├➽ ONGOING ANIME: <a href='https://t.me/Ongoing_portals'>ONGOING PORTALS</a>\n├➽ MANHWA / MANGA: <a href='https://t.me/manga_portals'>MANGA PORTALS</a>\n├➽ NETWORK: <a href='https://t.me/Anime_gateway'>ANIME GATEWAY</a>\n├➽ REQ / CHAT: <a href='https://t.me/+lB05vD5bGyszMzg1'>CHATTING HUB</a>\n╰───────────────⍟</blockquote>"
 M116_DEPLOY_CANCELLED = "Deployment cancelled successfully!"
 M117_ADMIN_ADDED = "You are now also my admin!"
