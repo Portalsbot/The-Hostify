@@ -287,6 +287,7 @@ async def deploy_bot(
     repo_url: str,
     env_vars: dict[str, str] | None = None,
     github_token: str | None = None,
+    deployed_by: int | None = None,
 ):
     """Clone, build and launch one bot. Returns (success, pid_or_reason).
 
@@ -423,7 +424,7 @@ async def deploy_bot(
 
             notify_channel = safe_env.get("NOTIFY_CHANNEL")
             try:
-                await add_bot(name, repo_url, safe_env, notify_channel)
+                await add_bot(name, repo_url, safe_env, notify_channel, deployed_by=deployed_by)
                 await update_status(name, "running", process.pid, process_created_at)
             except Exception:
                 await _terminate_process(process)
