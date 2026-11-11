@@ -480,7 +480,7 @@ async def resetmsg_handler(client: Client, message):
 
 _KNOWN_COMMANDS = {
     "start", "help", "deploy", "cancel", "list", "stop", "restart", "delete",
-    "logs", "status", "ping", "settings", "setbrand", "messages", "setmsg", "resetmsg",
+    "logs", "status", "ping", "settings", "setbrand", "messages", "setmsg", "resetmsg", "github",
 }
 
 
