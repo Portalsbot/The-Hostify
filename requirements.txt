@@ -4,3 +4,4 @@ python-dotenv>=1.0,<2
 psutil>=6,<8
 aiohttp>=3.10,<4
 cryptography>=43,<47
+PyJWT>=2.9,<3
