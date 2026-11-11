@@ -60,7 +60,6 @@ def _guide_text() -> str:
         "Do not paste the .pem key, Base64 key, Client Secret or other private credentials into Telegram or GitHub. "
         "Hostify does not require a Client Secret or webhook for this App-installation flow."
     )
-}
 
 async def _screen_text() -> tuple[str, bool]:
     if not is_configured():
@@ -189,9 +188,9 @@ async def github_callback(client: Client, query):
         return
 
     if action in {"refresh", "back"}:
-        await query.answer("Refreshing GitHub access…" if action == "refresh" else "")
         try:
             await _send_or_edit(query.message, edit=True)
+            await query.answer("GitHub status refreshed." if action == "refresh" else "")
         except Exception:
             logger.exception("Could not refresh the GitHub screen")
             await query.answer("Could not refresh GitHub status.", show_alert=True)
