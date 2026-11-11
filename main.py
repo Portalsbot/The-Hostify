@@ -34,10 +34,10 @@ async def health(request: web.Request) -> web.Response:
 async def main() -> None:
     global SERVICE_READY
 
-    # Persist the Pyrogram session on SESSION_DIR. Docker deployments mount
-    # this directory as /data so container replacement does not lose the session.
+    # Keep the Pyrogram session in SESSION_DIR. Docker mounts /data persistently.
     app = Client(
-        str(SESSION_DIR / "the_hostify"),
+        "the_hostify",
+        workdir=str(SESSION_DIR),
         api_id=API_ID,
         api_hash=API_HASH,
         bot_token=BOT_TOKEN,
