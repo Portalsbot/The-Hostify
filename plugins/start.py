@@ -11,6 +11,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from branding import get_branding
 from database import get_admins
 from smallcaps import sc
+import messages as M
 from .guard import is_owner, is_admin
 
 logger = logging.getLogger("hostify.plugins.start")
@@ -50,50 +51,26 @@ def _start_text() -> str:
     dev_user = branding.get("developer_username", "Just_astha").lstrip("@")
     channel_name = branding.get("bot_channel_name", "AceXbotz")
     channel_url = branding.get("bot_channel_url", CHANNEL_URL)
-    description = (
-        "I am a private hosting bot designed to make bot deployment and management "
-        "simple, fast, and reliable. You can host multiple bots directly through me "
-        "with an easy interface, automated updates, logging, and real-time system monitoring."
-    )
+    description = M.M112_START_DESCRIPTION
     return (
         "<b>🤖 MY NAME IS Hostify 2</b>\n\n"
         f"<blockquote>{html.escape(description)}</blockquote>\n"
         f"<blockquote>◈ OWNER: <a href=\"https://t.me/{html.escape(owner_user)}\">HCL</a></blockquote>\n"
         f"<blockquote>◈ DEVELOPER: <a href=\"https://t.me/{html.escape(dev_user)}\">Astha</a></blockquote>\n"
-        "<blockquote>◈ LANGUAGE: Python 3.13</blockquote>\n"
-        "<blockquote>◈ LIBRARY: Pyrofork (Pyrogram API)</blockquote>\n"
-        "<blockquote>◈ DATABASE: MongoDB (Async PyMongo)</blockquote>\n"
+        f"<blockquote>◈ LANGUAGE: {html.escape(branding.get('language', 'Python 3.13'))}</blockquote>\n"
+        f"<blockquote>◈ LIBRARY: {html.escape(branding.get('library', 'Pyrofork (Pyrogram API)'))}</blockquote>\n"
+        f"<blockquote>◈ DATABASE: {html.escape(branding.get('database', 'MongoDB (Async PyMongo)'))}</blockquote>\n"
         f"<blockquote>◈ BOT CHANNEL: <a href=\"{html.escape(channel_url, quote=True)}\">{html.escape(channel_name)}</a></blockquote>"
     )
 
 def _about_text() -> str:
-    return (
-        "<blockquote>WELCOME TO THE HOSTIFY.</blockquote>\n\n"
-        "<blockquote>YOUR PRIVATE TELEGRAM BOT HOSTING CONTROLLER IS ONLINE.</blockquote>"
-    )
+    return M.M113_ABOUT_MESSAGE
 
 def _help_text() -> str:
-    return (
-        "<blockquote>If you need help, contact admin "
-        f"<a href=\"{HELP_URL}\">Astha</a>.</blockquote>"
-    )
+    return M.M114_HELP_MESSAGE
 
 def _channel_text() -> str:
-    links = [
-        ("DEVELOPER", "JUST ASTHA", "https://t.me/Just_astha"),
-        ("OWNER", "HCL", "https://t.me/reactivehcl"),
-        ("ANIME INDEX", "MASTER INDEX", "https://t.me/master_index"),
-        ("FINISHED ANIME", "ANIME PORTALS", "https://t.me/Anime_portals"),
-        ("ONGOING ANIME", "ONGOING PORTALS", "https://t.me/Ongoing_portals"),
-        ("MANHWA / MANGA", "MANGA PORTALS", "https://t.me/manga_portals"),
-        ("NETWORK", "ANIME GATEWAY", "https://t.me/Anime_gateway"),
-        ("REQ / CHAT", "CHATTING HUB", "https://t.me/+lB05vD5bGyszMzg1"),
-    ]
-    rows = ["╭───────────────⍟"]
-    for label, title, url in links:
-        rows.append(f"├➽ {label}: <a href=\"{url}\">{title}</a>")
-    rows.append("╰───────────────⍟")
-    return "<blockquote>" + "\n".join(rows) + "</blockquote>"
+    return M.M115_CHANNEL_MESSAGE
 
 async def _commands_text(user_id: int) -> str:
     lines = [
