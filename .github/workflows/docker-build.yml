@@ -1,4 +1,4 @@
-name: Docker build check
+name: Python 3 checks
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -18,11 +18,14 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
       - name: Compile Python files
         run: python -m compileall -q .
 
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
       - name: Check whitespace errors
         run: git diff --check
-
-      - name: Build controller image
-        run: docker build -t the-hostify:ci .
