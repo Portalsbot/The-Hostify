@@ -234,7 +234,7 @@ async def bot_callback(client: Client, query):
             sc("\n".join(lines)),
             parse_mode=ParseMode.DISABLED,
             reply_markup=_keyboard([
-                [InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}")],
+                [InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}")],
                 [InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")],
             ]),
         )
@@ -246,7 +246,7 @@ async def bot_callback(client: Client, query):
         await query.message.edit_text(
             sc(f"Send environment variables for {name} as KEY=VALUE, one per line. Use KEY=DELETE to remove a variable. Secret values are encrypted in MongoDB. Send /cancel to abort."),
             parse_mode=ParseMode.DISABLED,
-            reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}")]]),
+            reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]),
         )
         await query.answer()
         return
