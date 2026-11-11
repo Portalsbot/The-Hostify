@@ -22,20 +22,45 @@ _INSTALL_PAGE = "https://github.com/apps/the-hostify/installations/new"
 
 
 def _keyboard(ready: bool) -> InlineKeyboardMarkup:
-    rows = []
     if ready:
-        rows.append([
-            InlineKeyboardButton("Refresh", callback_data="hostify:github:refresh"),
-            InlineKeyboardButton("Close", callback_data="hostify:github:close"),
+        return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("Refresh", callback_data="hostify:github:refresh"),
+                InlineKeyboardButton("Setup Guide", callback_data="hostify:github:guide"),
+            ],
+            [InlineKeyboardButton("Close", callback_data="hostify:github:close")],
         ])
-    else:
-        rows.append([
+    return InlineKeyboardMarkup([
+        [
             InlineKeyboardButton("Open GitHub App", url=_APP_PAGE),
             InlineKeyboardButton("Install App", url=_INSTALL_PAGE),
-        ])
-        rows.append([InlineKeyboardButton("Close", callback_data="hostify:github:close")])
-    return InlineKeyboardMarkup(rows)
+        ],
+        [InlineKeyboardButton("Setup Guide", callback_data="hostify:github:guide")],
+        [InlineKeyboardButton("Close", callback_data="hostify:github:close")],
+    ])
 
+
+def _guide_text() -> str:
+    return (
+        "GITHUB APP SETUP GUIDE\\n\\n"
+        "1. Open your GitHub App: https://github.com/apps/the-hostify\\n"
+        "2. In General, note the App ID and App slug.\\n"
+        "3. In Permissions & events, set Repository permissions: Contents = Read-only; Metadata = Read-only. Save changes.\\n"
+        "4. In Install App, choose your GitHub account and select only the repositories Hostify may deploy.\\n"
+        "5. In General, generate a Private Key and keep the downloaded .pem file private.\\n\\n"
+        "WINDOWS: Encode the .pem file as Base64 in PowerShell, then copy the result:\\n"
+        "$pem = Get-ChildItem \"$env:USERPROFILE\\\\Downloads\\\\*.pem\" | Sort-Object LastWriteTime -Descending | Select-Object -First 1\\n"
+        "if (-not $pem) { throw \"No .pem file found in Downloads\" }\\n"
+        "[Convert]::ToBase64String([IO.File]::ReadAllBytes($pem.FullName)) | Set-Clipboard\\n\\n"
+        "6. In Render → Hostify → Environment, add:\\n"
+        "GITHUB_APP_ID = your App ID\\n"
+        "GITHUB_APP_SLUG = your App slug\\n"
+        "GITHUB_APP_PRIVATE_KEY_B64 = paste the copied Base64 value\\n\\n"
+        "7. Save and redeploy. Then send /github to verify the connection.\\n\\n"
+        "Do not paste the .pem key, Base64 key, Client Secret or other private credentials into Telegram or GitHub. "
+        "Hostify does not require a Client Secret or webhook for this App-installation flow."
+    )
+}
 
 async def _screen_text() -> tuple[str, bool]:
     if not is_configured():
@@ -150,8 +175,21 @@ async def github_callback(client: Client, query):
         await query.message.delete()
         return
 
-    if action == "refresh":
-        await query.answer("Refreshing GitHub access…")
+    if action == "guide":
+        await query.message.edit_text(
+            sc(_guide_text()),
+            parse_mode=ParseMode.DISABLED,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("Back", callback_data="hostify:github:back"),
+                InlineKeyboardButton("Close", callback_data="hostify:github:close"),
+            ]]),
+            disable_web_page_preview=True,
+        )
+        await query.answer()
+        return
+
+    if action in {"refresh", "back"}:
+        await query.answer("Refreshing GitHub access…" if action == "refresh" else "")
         try:
             await _send_or_edit(query.message, edit=True)
         except Exception:
