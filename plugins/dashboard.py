@@ -290,6 +290,15 @@ async def bot_callback(client: Client, query):
     await query.answer(result[:180], show_alert=not ok)
 
 
+def cancel_environment_edit(user_id: int, chat_id: int) -> bool:
+    """Clear the user's pending environment edit flow."""
+    pending = _env_sessions.get(user_id)
+    if pending is None or pending[0] != chat_id:
+        return False
+    _env_sessions.pop(user_id, None)
+    return True
+
+
 @Client.on_message(filters.private & filters.text & ~filters.regex(r"^/"), group=6)
 async def environment_input(client: Client, message):
     user = message.from_user
