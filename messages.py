@@ -30,28 +30,15 @@ Your private Telegram bot hosting controller is online.
 🛠 Developer: {developer_mention} (ID: {developer_id})
 💬 Owner / Support: {support_mention} (ID: {support_id})
 
-Send /help to view commands. Use /settings to edit branding and messages."""
-M04_HELP = """Available commands:
+Use /commands for owner commands."""
+M04_HELP = """Public commands:
 
-/deploy — Deploy a public GitHub repository
-/list — List deployed bots
-/stop <name> — Stop a bot
-/restart <name> — Restart a bot
-/delete <name> — Delete a bot (second confirmation required)
-/logs <name> — View the last 20 log lines
-/status — View controller resource status
-/cancel — Cancel an active deployment setup
+/start — Open the welcome menu
+/command — View available commands
+/admins — View the admin team
 /ping — Check controller connectivity
-/settings — View editable branding and settings
-/setbrand <field> <value> — Edit usernames, IDs or display name
-/messages — List editable message templates
-/setmsg <KEY> <text> — Edit a message from Telegram
-/resetmsg <KEY> — Restore a default message
 
-All controller commands are owner-only. Private GitHub repositories are not supported.
-
-📣 Updates: {promo_channel_mention} | {promo_channel_url} (ID: {promo_channel_id})
-🛠 Developer: {developer_mention} (ID: {developer_id})\n💬 Support: {support_mention} (ID: {support_id})"""
+Administrators also have deployment commands. Owner-only commands are available through /commands."""
 M07_ASK_REPO = "Send me the repo URL to deploy."
 M08_INVALID_URL = "That is not a valid GitHub repository URL. Send it again, or /cancel to abort."
 M09_ASK_NAME = "Send me a deployment name."
