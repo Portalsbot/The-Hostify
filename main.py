@@ -87,6 +87,18 @@ async def main() -> None:
         app_started = True
 
         me = await app.get_me()
+        from command_menu import sync_default_commands, sync_user_commands
+        from database import get_admins
+        try:
+            await sync_default_commands()
+            await sync_user_commands(me.id, "owner")
+            for admin in await get_admins():
+                admin_id = admin.get("user_id")
+                if isinstance(admin_id, int) and admin_id > 0:
+                    await sync_user_commands(admin_id, "admin")
+        except Exception:
+            logger.exception("Could not synchronize Telegram command menus")
+
         SERVICE_READY = True
         logger.info("CONNECTED BOT: @%s | BOT ID: %s", me.username, me.id)
         from plugins.controller import notify_startup
