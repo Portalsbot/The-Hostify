@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-import secrets
-import time
 from typing import Any
 
 from pyrogram import Client, filters
@@ -14,17 +12,13 @@ import messages as M
 from branding import get_branding
 from config import OWNER_ID
 from database import get_bot
-from manager import delete_bot, restart_bot, stop_bot
+from manager import restart_bot, stop_bot
 from utils import format_output
 from .guard import is_owner
 
 logger = logging.getLogger("hostify.plugins.channel")
 
-_ACTION_PATTERN = re.compile(r"^hc:(restart|stop|delete):([A-Za-z0-9_]{1,32})$")
-_CONFIRM_PATTERN = re.compile(r"^hc:(confirm|cancel):([A-Za-z0-9_-]{12})$")
-_DELETE_CONFIRM_TTL = 60
-# token -> (owner_id, channel_id, message_id, bot_name, expiry_monotonic)
-_PENDING_CHANNEL_DELETES: dict[str, tuple[int, int, int, str, float]] = {}
+_ACTION_PATTERN = re.compile(r"^hc:(restart|stop):([A-Za-z0-9_]{1,32})$")
 
 
 async def _answer(callback: CallbackQuery, text: object, **kwargs):
@@ -37,21 +31,8 @@ def _action_keyboard(name: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(format_output(M.M108_BTN_RESTART), callback_data=f"hc:restart:{name}"),
             InlineKeyboardButton(format_output(M.M109_BTN_STOP), callback_data=f"hc:stop:{name}"),
         ],
-        [InlineKeyboardButton(format_output(M.M110_BTN_DELETE), callback_data=f"hc:delete:{name}")],
+        [InlineKeyboardButton("Close", callback_data="hostify:ui:close")],
     ])
-
-
-def _delete_confirmation_keyboard(token: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton(format_output(M.M106_BTN_CONFIRM_DELETE), callback_data=f"hc:confirm:{token}"),
-        InlineKeyboardButton(format_output(M.M107_BTN_CANCEL), callback_data=f"hc:cancel:{token}"),
-    ]])
-
-
-def _purge_expired_confirmations() -> None:
-    now = time.monotonic()
-    for token in [key for key, value in _PENDING_CHANNEL_DELETES.items() if value[4] <= now]:
-        _PENDING_CHANNEL_DELETES.pop(token, None)
 
 
 def _hidden_environment_summary(env_vars: dict[str, str] | None) -> str:
@@ -94,7 +75,7 @@ async def post_deploy_announcement(
     repo_url: str,
     env_vars: dict[str, str] | None = None,
 ) -> bool:
-    """Post optional deployment notice; failure never reverses a successful deploy."""
+    """Post an optional deployment notice with owner-only restart/stop controls."""
     channel = (env_vars or {}).get("NOTIFY_CHANNEL")
     if not channel:
         return False
@@ -188,129 +169,55 @@ async def channel_controls(client: Client, callback: CallbackQuery) -> None:
         await _answer(callback, M.M02_NON_OWNER_ALERT, show_alert=True)
         return
 
-    data = callback.data or ""
-    action_match = _ACTION_PATTERN.fullmatch(data)
-    confirm_match = _CONFIRM_PATTERN.fullmatch(data)
+    match = _ACTION_PATTERN.fullmatch(callback.data or "")
+    if not match:
+        await _answer(callback, "Unknown or expired Hostify control.", show_alert=True)
+        return
 
-    if action_match:
-        action, name = action_match.groups()
-        bot = await get_bot(name)
-        if not bot:
-            await _answer(callback, M.M25_NOT_FOUND.format(name=name), show_alert=True)
-            return
-        if not await _is_valid_announcement(client, callback, bot):
-            await _answer(callback, M.M67_ANNOUNCEMENT_UNVERIFIED, show_alert=True)
+    action, name = match.groups()
+    bot = await get_bot(name)
+    if not bot:
+        await _answer(callback, M.M25_NOT_FOUND.format(name=name), show_alert=True)
+        return
+    if not await _is_valid_announcement(client, callback, bot):
+        await _answer(callback, M.M67_ANNOUNCEMENT_UNVERIFIED, show_alert=True)
+        return
+
+    message = callback.message
+    if message is None:
+        await _answer(callback, M.M66_ANNOUNCEMENT_UNAVAILABLE, show_alert=True)
+        return
+
+    username = bot.get("bot_username") or name
+    bot_mention = f"@{username}"
+    try:
+        if action == "restart":
+            ok, detail = await restart_bot(name)
+            replacement = M.M30_LINE_RESTARTED.format(bot_mention=bot_mention)
+            dm_text = M.M31_DM_RESTARTED.format(bot_mention=bot_mention)
+        else:
+            ok, detail = await stop_bot(name)
+            replacement = M.M30_LINE_STOPPED.format(bot_mention=bot_mention)
+            dm_text = M.M31_DM_STOPPED.format(bot_mention=bot_mention)
+
+        if not ok:
+            error = M.M25_NOT_FOUND.format(name=name) if detail == "not_found" else M.M94_CHANNEL_OPERATION_FAILED.format(reason=detail or "unknown error")
+            await _answer(callback, error[:180], show_alert=True)
             return
 
-        message = callback.message
-        if message is None:
-            await _answer(callback, M.M66_ANNOUNCEMENT_UNAVAILABLE, show_alert=True)
-            return
-
-        username = bot.get("bot_username") or name
-        bot_mention = f"@{username}"
-        if action == "delete":
-            _purge_expired_confirmations()
-            token = secrets.token_urlsafe(9)
-            _PENDING_CHANNEL_DELETES[token] = (
-                user_id,
-                message.chat.id,
-                message.id,
-                name,
-                time.monotonic() + _DELETE_CONFIRM_TTL,
+        await _edit_announcement(message, _replace_status_line(message, replacement), _action_keyboard(name))
+        try:
+            await client.send_message(
+                OWNER_ID,
+                format_output(dm_text),
+                parse_mode=ParseMode.DISABLED,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("Close", callback_data="hostify:ui:close")
+                ]]),
             )
-            await message.edit_reply_markup(reply_markup=_delete_confirmation_keyboard(token))
-            await _answer(callback, M.M93_CHANNEL_CONFIRM)
-            return
-
-        try:
-            if action == "restart":
-                ok, detail = await restart_bot(name)
-                replacement = M.M30_LINE_RESTARTED.format(bot_mention=bot_mention)
-                dm_text = M.M31_DM_RESTARTED.format(bot_mention=bot_mention)
-            else:
-                ok, detail = await stop_bot(name)
-                replacement = M.M30_LINE_STOPPED.format(bot_mention=bot_mention)
-                dm_text = M.M31_DM_STOPPED.format(bot_mention=bot_mention)
-
-            if not ok:
-                error = M.M25_NOT_FOUND.format(name=name) if detail == "not_found" else M.M94_CHANNEL_OPERATION_FAILED.format(reason=detail or 'unknown error')
-                await _answer(callback, error[:180], show_alert=True)
-                return
-
-            await _edit_announcement(message, _replace_status_line(message, replacement), _action_keyboard(name))
-            try:
-                await client.send_message(
-                    OWNER_ID,
-                    format_output(dm_text),
-                    parse_mode=ParseMode.DISABLED,
-                )
-            except Exception:
-                logger.warning("Could not send owner DM for %s", action, exc_info=True)
-            await _answer(callback, M.M95_CHANNEL_OPERATION_COMPLETED)
         except Exception:
-            logger.exception("Channel %s action failed for %s", action, name)
-            await _answer(callback, M.M68_OPERATION_FAILED, show_alert=True)
-        return
-
-    if confirm_match:
-        action, token = confirm_match.groups()
-        pending = _PENDING_CHANNEL_DELETES.get(token)
-        if pending is None:
-            await _answer(callback, M.M69_CONFIRM_EXPIRED_CHANNEL, show_alert=True)
-            return
-
-        expected_owner, expected_chat, expected_message, name, expiry = pending
-        message = callback.message
-        if (
-            message is None
-            or message.chat.type != ChatType.CHANNEL
-            or message.chat.id != expected_chat
-            or message.id != expected_message
-            or user_id != expected_owner
-        ):
-            await _answer(callback, M.M70_CONFIRM_WRONG_OWNER, show_alert=True)
-            return
-
-        bot = await get_bot(name)
-        if not bot or not await _is_valid_announcement(client, callback, bot):
-            _PENDING_CHANNEL_DELETES.pop(token, None)
-            await _answer(callback, M.M71_RECORD_INVALID, show_alert=True)
-            return
-        if time.monotonic() > expiry:
-            _PENDING_CHANNEL_DELETES.pop(token, None)
-            await _answer(callback, M.M69_CONFIRM_EXPIRED_CHANNEL, show_alert=True)
-            return
-
-        # Consume before awaiting deletion so a double-click cannot run twice.
-        _PENDING_CHANNEL_DELETES.pop(token, None)
-        if action == "cancel":
-            await message.edit_reply_markup(reply_markup=_action_keyboard(name))
-            await _answer(callback, M.M64_DELETE_CANCELLED)
-            return
-
-        try:
-            ok, detail = await delete_bot(name)
-            if not ok:
-                await _answer(callback, M.M96_CHANNEL_DELETE_FAILED.format(reason=detail or 'unknown error')[:180], show_alert=True)
-                await message.edit_reply_markup(reply_markup=_action_keyboard(name))
-                return
-
-            username = bot.get("bot_username") or name
-            new_text = _replace_status_line(message, M.M30_LINE_DELETED.format(bot_mention=f"@{username}"))
-            await _edit_announcement(message, new_text, keyboard=None)
-            try:
-                await client.send_message(
-                    OWNER_ID,
-                    format_output(M.M31_DM_DELETED.format(bot_mention=f"@{username}")),
-                    parse_mode=ParseMode.DISABLED,
-                )
-            except Exception:
-                logger.warning("Could not send owner delete notification", exc_info=True)
-            await _answer(callback, M.M97_CHANNEL_BOT_DELETED)
-        except Exception:
-            logger.exception("Channel deletion failed for %s", name)
-            await _answer(callback, M.M72_DELETE_FAILED, show_alert=True)
-        return
-
-    await _answer(callback, M.M73_UNKNOWN_CONTROL, show_alert=True)
+            logger.warning("Could not send owner DM for %s", action, exc_info=True)
+        await _answer(callback, M.M95_CHANNEL_OPERATION_COMPLETED)
+    except Exception:
+        logger.exception("Channel %s action failed for %s", action, name)
+        await _answer(callback, M.M68_OPERATION_FAILED, show_alert=True)
