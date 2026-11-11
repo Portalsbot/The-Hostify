@@ -17,6 +17,8 @@ from database import get_bot
 from deployer import deploy_bot, _validate_env_vars, _validate_name, _validate_repo_url
 from github_app import GitHubAppError, get_installation_token_for_repository
 from .guard import is_owner_or_admin
+from .admins import cancel_admin_add
+from .dashboard import cancel_environment_edit
 from .channel import post_deploy_announcement
 
 logger = logging.getLogger("hostify.plugins.deploy_flow")
@@ -128,6 +130,13 @@ async def deploy_command(client: Client, message):
 async def cancel_deploy(client: Client, message):
     user = message.from_user
     if user is None or not await is_owner_or_admin(user.id):
+        return
+
+    if cancel_admin_add(user.id, message.chat.id):
+        await _reply(message, "Admin creation cancelled.")
+        return
+    if cancel_environment_edit(user.id, message.chat.id):
+        await _reply(message, "Environment editing cancelled.")
         return
 
     async with _session_lock:
