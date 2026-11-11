@@ -14,6 +14,7 @@ from utils import format_output
 import messages as M
 from database import get_bot
 from deployer import deploy_bot, _validate_env_vars, _validate_name, _validate_repo_url
+from github_app import GitHubAppError, get_installation_token_for_repository
 from .guard import owner_only
 from .channel import post_deploy_announcement
 
@@ -217,7 +218,14 @@ async def deploy_input_handler(client: Client, message):
     await _reply(message, M.M12_DEPLOYING.format(name=name))
 
     try:
-        success, detail = await deploy_bot(name, repo_url, env_vars)
+        try:
+            github_token = await get_installation_token_for_repository(repo_url)
+        except GitHubAppError as exc:
+            logger.warning("GitHub repository authorization failed for %s: %s", repo_url, exc)
+            await _reply(message, M.M14_DEPLOY_FAIL.format(name=name, reason=str(exc)[:_MAX_DETAIL_CHARS]))
+            return
+
+        success, detail = await deploy_bot(name, repo_url, env_vars, github_token=github_token)
 
         if success:
             # Channel notifications are best-effort. A database or Telegram
