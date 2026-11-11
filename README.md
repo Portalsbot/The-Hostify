@@ -1,122 +1,114 @@
-# The Hostify
+# Hostify 2
 
-The Hostify is a Telegram-controlled Python bot deployment manager. The repository can run directly with Python or as a Docker container.
+Hostify is a native Python 3.13 Telegram controller for deploying and managing approved Python bot projects.
 
-> Important: the Dockerfile packages the Hostify controller itself. The current customer deployment engine still runs Python projects as child processes; it does not build or manage separate customer Docker containers. GitHub App support can access selected private repositories, but deployment execution remains disabled by default until you explicitly accept the current unsandboxed execution risk.
+This repository intentionally uses Render's **native Python runtime**. It does not include a controller Dockerfile or Compose file. The customer deployment engine currently creates a Python virtual environment for each deployed project and launches it as a child process.
 
-## Run The Hostify controller in Docker
+## Render deployment
 
-1. Copy .env.example to .env and fill in API_ID, API_HASH, BOT_TOKEN, OWNER_ID, MONGO_URI and DATA_ENCRYPTION_KEY.
-2. Generate the Fernet key with:
+Create a **Python 3 Web Service** from this repository.
+
+- Runtime: Python 3.13 (from `.python-version`)
+- Build command: `pip install -r requirements.txt`
+- Start command: `python main.py`
+- Health check path: `/health`
+
+Set the variables from `.env.example` in Render's Environment page. Use persistent storage for the Telegram session and deployed projects if your Render plan supports it. Render Free services may sleep and have ephemeral storage; they are not suitable for guaranteed continuous hosting of child bots.
+
+## Required environment
+
+- `API_ID`, `API_HASH`, `BOT_TOKEN`, `OWNER_ID`
+- `MONGO_URI`
+- `DATA_ENCRYPTION_KEY` — Fernet key used to encrypt stored deployment environment variables.
+- `BASE_DIR` — writable directory for deployed project files.
+- `SESSION_DIR` — writable directory for the Telegram session.
+- `PORT` — Render web service port.
+
+Generate the encryption key:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-3. Install Docker Engine and Docker Compose, then run:
+## GitHub App integration
 
-```bash
-docker compose up -d --build
-```
+The GitHub App lets Hostify inspect installations and read selected repositories, including private repositories.
 
-4. Inspect the service:
+Render variables:
 
-```bash
-docker compose logs -f hostify
-docker compose ps
-```
+- `GITHUB_APP_ID`
+- `GITHUB_APP_SLUG`
+- `GITHUB_APP_PRIVATE_KEY_B64` — Base64-encoded contents of the downloaded GitHub App `.pem` file.
 
-5. Open http://YOUR_SERVER_IP:10000/health. The endpoint returns status=ok after the Telegram controller connects.
+Keep the private key in Render's secret environment configuration. Never commit it or send it through Telegram.
 
-The Compose definition stores the Pyrogram session in a persistent named volume at /data and deployed bot files in a second volume at /var/lib/hostify_bots. The controller runs as a non-root user, with a read-only root filesystem, dropped capabilities, no-new-privileges and a health check.
+The App should have Repository permissions:
+- Contents: Read-only
+- Metadata: Read-only
 
-### Build and run manually
+Install the App on the GitHub account and grant it access only to repositories Hostify is intended to deploy.
 
-```bash
-docker build -t the-hostify:latest .
-docker volume create hostify-controller-data
-docker volume create hostify-bots-data
-docker run -d --name the-hostify --restart unless-stopped \
-  --env-file .env -e PORT=10000 -e SESSION_DIR=/data \
-  -e BASE_DIR=/var/lib/hostify_bots -p 10000:10000 \
-  -v hostify-controller-data:/data \
-  -v hostify-bots-data:/var/lib/hostify_bots \
-  the-hostify:latest
-```
-
-## Run directly with Python
-
-Use Python 3.13 on Linux with Git installed.
-
-```bash
-python -m pip install -r requirements.txt
-python main.py
-```
-
-Set SESSION_DIR=./data and BASE_DIR to a persistent writable directory for a native installation.
-
-## Render deployment
-
-For a Render Python Web Service:
-
-- Build command: pip install -r requirements.txt
-- Start command: python main.py
-- Health check path: /health
-
-Add the variables from .env.example in Render Environment settings. For GitHub App access, also set GITHUB_APP_ID, GITHUB_APP_SLUG and GITHUB_APP_PRIVATE_KEY_B64. Encode the downloaded GitHub App .pem file as Base64 before placing it in the Render secret value. Never commit the private key or send it through Telegram. Render Free Web Services may sleep and use ephemeral local storage; they are not a guarantee that child bot processes and their files will survive restarts or redeploys.
-
-## Current features
-
-- Telegram owner-only deployment and management commands.
-- GitHub App authentication and listing of installed repositories.
-- Public GitHub repository cloning and selected private repository cloning through short-lived GitHub App installation tokens.
-- Python bot deployment using requirements.txt and an entry point.
-- Start, stop, restart, delete, logs, resource status and watchdog recovery.
-- Encrypted environment-variable storage using Fernet.
-- MongoDB-backed branding and editable message templates.
-- HTTP health endpoints at / and /health.
-- Dockerfile and Compose packaging for the Hostify controller.
+Use `/github` in the owner account to check the connection and list accessible repositories. During deployment, Hostify obtains a short-lived installation token for a selected private repository. The token is not placed in the clone URL or saved in the database.
 
 ## Telegram commands
 
+### Public commands
+
 | Command | Purpose |
 |---|---|
-| /start | Welcome message and branding |
-| /help | Command reference |
-| /deploy | Start the public or GitHub-App-authorised repository deployment flow |
-| /cancel | Cancel deployment setup |
-| /list | List deployed bots and status |
-| /stop NAME | Stop a bot |
-| /restart NAME | Restart a bot |
-| /delete NAME | Request deletion; confirm with the inline button |
-| /logs NAME | Show the latest 20 log lines |
-| /status | Show host CPU, RAM, disk and tracked bot counts |
-| /ping | Owner-only Telegram update check |
-| /github | Check GitHub App connection and list accessible repositories |
-| /settings | Show editable branding and message controls |
-| /setbrand FIELD VALUE | Change a branding field |
-| /messages | List editable message-template keys |
-| /setmsg KEY TEXT | Save a custom message in MongoDB |
-| /resetmsg KEY | Restore the built-in message for a key |
+| `/start` | Open the welcome menu |
+| `/command` | View public and admin commands |
+| `/admins` | View the current admin team |
+| `/ping` | Check Telegram connectivity |
 
-## Editable branding and messages
+### Approved admin commands
 
-The owner can use /setbrand FIELD VALUE to update brand_name, developer_username, developer_id, support_username, support_id, promo_channel_username or promo_channel_id.
+| Command | Purpose |
+|---|---|
+| `/deploy` | Deploy a repository |
+| `/cancel` | Cancel an active deployment setup |
+| `/list` | View the admin's own deployments |
+| `/mylogs` | View the last 40 Hostify controller log lines |
+| `/restartme` | Request a controller restart |
+| `/stopme` | Request a controller shutdown |
 
-Use /messages to list editable message keys. Use /setmsg KEY TEXT to save a custom template and /resetmsg KEY to restore its built-in default. Keep dynamic placeholders such as {name}, {pid}, {developer_id} and {promo_channel_url} when needed. Changes are stored in MongoDB. OWNER_ID remains an environment setting to prevent owner lockout.
+Admins cannot stop, restart or delete deployments created by other users.
 
-## Security and limitations
+### Owner-only commands
 
-- The controller Docker image is not a customer-container deployment engine.
-- Customer Python processes currently run under the Hostify service account. There is no per-customer container or OS sandbox in this version.
-- ALLOW_UNSANDBOXED_DEPLOYMENTS=false is the default. Enabling it is an explicit risk acceptance, not a security boundary.
-- Do not deploy untrusted repositories or offer public multi-tenant hosting with this version.
-- The deployment flow can use public repositories anonymously or selected private repositories through the installed GitHub App. Installation tokens are short-lived and are not stored in the database or inserted into repository URLs. Never put access tokens in repository URLs.
-- Docker packaging does not make Render Free a 24/7 host. Use persistent hosting and storage for continuous operation.
-- Capacity depends on the host's actual CPU, RAM, disk, network and provider limits; no fixed bot count is guaranteed.
+| Command | Purpose |
+|---|---|
+| `/commands` | Show owner command reference |
+| `/list` | View every deployment |
+| `/stop NAME` | Stop a deployment |
+| `/restart NAME` | Restart a deployment |
+| `/delete NAME` | Delete a deployment after confirmation |
+| `/logs NAME` | Read deployment logs |
+| `/status` | View CPU, RAM, storage and deployment counts |
+| `/settings` | Open Hostify settings |
+| `/setbrand FIELD VALUE` | Edit welcome-page branding |
+| `/messageonly` | Browse editable message templates |
+| `/setmsg KEY TEXT` | Edit a message template |
+| `/resetmsg KEY` | Restore a default template |
+| `/addadmin` | Add an admin by Telegram user ID |
+| `/removeadmin` | Select and remove an admin |
+| `/github` | Inspect GitHub App connection status |
 
-## Health check
+## Current deployment capability and security
 
-- GET / — service health JSON
-- GET /health — same health response
-- Status is starting until the Telegram client connects, then ok.
+- The controller is Python 3.13 and runs natively on Render.
+- Hostify can deploy Python projects with a root-level `requirements.txt` and one of `main.py`, `bot.py` or `app.py`.
+- Public repositories can be cloned anonymously. Selected private repositories use short-lived GitHub App installation tokens.
+- Each deployment's environment variables are encrypted in MongoDB.
+- Each deployment is recorded with the Telegram user ID of the admin who created it.
+- Owners can manage all deployments. Admins can view their own deployments and cannot stop, restart or delete them.
+- `ALLOW_UNSANDBOXED_DEPLOYMENTS=false` is the safe default. Enabling it allows trusted admin-submitted Python code to execute under the Hostify service account. This is **not a sandbox**. Only enable it when every admin and repository is trusted.
+- Docker Engine integration for customer projects, Java runtime deployment, and isolated per-project containers are not implemented in this version. The `/docker` command is intentionally not registered.
+- Controller shutdown/restart commands rely on the hosting provider's process restart behaviour. Use the Render dashboard to suspend or manually restart the service when required.
+
+## Health endpoint
+
+- `GET /`
+- `GET /health`
+
+The endpoint reports `starting` until the Telegram client connects, then `ok`.
