@@ -44,7 +44,7 @@ async def health(request: web.Request) -> web.Response:
 async def main() -> None:
     global SERVICE_READY
 
-    # Keep the Pyrogram session in SESSION_DIR. Docker mounts /data persistently.
+    # Keep the Pyrogram session in the configured writable SESSION_DIR.
     app = Client(
         "the_hostify",
         workdir=str(SESSION_DIR),
