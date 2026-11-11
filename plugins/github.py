@@ -106,7 +106,7 @@ async def _screen_text() -> tuple[str, bool]:
             "Install the app on your GitHub account and select the repositories Hostify may use.",
         ])
 
-    return "\n".join(lines), True
+    return "\n".join(lines), bool(installations)
 
 
 async def _send_or_edit(target, *, edit: bool = False):
