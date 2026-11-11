@@ -2,19 +2,29 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from aiohttp import web
 from pyrogram import Client, idle
 
-from config import API_ID, API_HASH, BOT_TOKEN, SESSION_DIR, PORT
+from config import API_ID, API_HASH, BOT_TOKEN, SESSION_DIR, PORT, BASE_DIR
 from database import close_database, verify_database_connection
 from branding import load_branding
 from utils import load_message_templates
 from watchdog import watchdog_loop
 
+Path(BASE_DIR).mkdir(parents=True, exist_ok=True)
+_file_handler = RotatingFileHandler(
+    Path(BASE_DIR) / "hostify.log",
+    maxBytes=2 * 1024 * 1024,
+    backupCount=3,
+    encoding="utf-8",
+)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    handlers=[logging.StreamHandler(), _file_handler],
 )
 
 logger = logging.getLogger("hostify")
@@ -79,6 +89,8 @@ async def main() -> None:
         me = await app.get_me()
         SERVICE_READY = True
         logger.info("CONNECTED BOT: @%s | BOT ID: %s", me.username, me.id)
+        from plugins.controller import notify_startup
+        await notify_startup(app)
 
         watchdog_task = asyncio.create_task(
             watchdog_loop(app),
