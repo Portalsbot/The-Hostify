@@ -5,7 +5,9 @@ import logging
 import os
 import re
 import signal
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -280,7 +282,12 @@ async def _launch(bot_dir: Path, env_vars: dict[str, str]) -> asyncio.subprocess
         raise
 
 
-async def deploy_bot(name: str, repo_url: str, env_vars: dict[str, str] | None = None):
+async def deploy_bot(
+    name: str,
+    repo_url: str,
+    env_vars: dict[str, str] | None = None,
+    github_token: str | None = None,
+):
     """Clone, build and launch one bot. Returns (success, pid_or_reason).
 
     IMPORTANT: This improves process handling and secret separation, but does
@@ -310,18 +317,52 @@ async def deploy_bot(name: str, repo_url: str, env_vars: dict[str, str] | None =
 
         try:
             bot_dir.parent.mkdir(parents=True, exist_ok=True)
-            clone_code, clone_log = await _run_logged(
-                ["git", "clone", "--depth", "1", "--", repo_url, str(bot_dir)],
-                cwd=bot_dir.parent,
-                env={
-                    "PATH": "/usr/local/bin:/usr/bin:/bin",
-                    "HOME": str(bot_dir.parent),
-                    "LANG": "C.UTF-8",
-                    "LC_ALL": "C.UTF-8",
-                },
-                log_path=bot_dir.parent / f".{name}.deploy.log",
-                timeout=CLONE_TIMEOUT_SECONDS,
-            )
+            clone_env = {
+                "PATH": "/usr/local/bin:/usr/bin:/bin",
+                "HOME": str(bot_dir.parent),
+                "LANG": "C.UTF-8",
+                "LC_ALL": "C.UTF-8",
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_TERMINAL_PROMPT": "0",
+            }
+            askpass_dir = None
+            try:
+                if github_token:
+                    # Keep the short-lived installation token out of the clone URL,
+                    # command arguments, logs, database and deployed bot environment.
+                    askpass_dir = Path(tempfile.mkdtemp(
+                        prefix=f".{name}.git-auth-",
+                        dir=str(bot_dir.parent),
+                    ))
+                    askpass = askpass_dir / "askpass.sh"
+                    askpass.write_text(
+                        "#!/bin/sh\\n"
+                        "case \"$1\" in\\n"
+                        "  *Username*) printf '%s\\n' 'x-access-token' ;;\\n"
+                        "  *Password*) printf '%s\\n' \"$HOSTIFY_GITHUB_TOKEN\" ;;\\n"
+                        "  *) exit 1 ;;\\n"
+                        "esac\\n",
+                        encoding="utf-8",
+                    )
+                    askpass.chmod(0o700)
+                    clone_env.update({
+                        "HOME": str(askpass_dir),
+                        "GIT_ASKPASS": str(askpass),
+                        "GIT_ASKPASS_REQUIRE": "force",
+                        "HOSTIFY_GITHUB_TOKEN": github_token,
+                    })
+
+                clone_code, clone_log = await _run_logged(
+                    ["git", "clone", "--depth", "1", "--", repo_url, str(bot_dir)],
+                    cwd=bot_dir.parent,
+                    env=clone_env,
+                    log_path=bot_dir.parent / f".{name}.deploy.log",
+                    timeout=CLONE_TIMEOUT_SECONDS,
+                )
+            finally:
+                clone_env.pop("HOSTIFY_GITHUB_TOKEN", None)
+                if askpass_dir is not None:
+                    shutil.rmtree(askpass_dir, ignore_errors=True)
             if clone_code != 0:
                 logger.error("Git clone failed for %s: %s", name, clone_log[-3_000:])
                 return False, "Git clone failed; inspect the deployment log on the server."
