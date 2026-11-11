@@ -81,7 +81,7 @@ def _list_keyboard(category: str, bots: list[dict], page: int):
         status_mark = "🟢" if bot.get("status") == "running" else "⚪"
         row.append(InlineKeyboardButton(
             f"{status_mark} {name}"[:60],
-            callback_data=f"hostify:bot:view:{name}",
+            callback_data=f"hostify:bot:view:{name}:{category}:{page}",
         ))
         if len(row) == 2:
             rows.append(row)
@@ -121,19 +121,19 @@ def _detail_text(bot: dict) -> str:
     )
 
 
-def _detail_keyboard(name: str, owner: bool, status: str):
+def _detail_keyboard(name: str, owner: bool, status: str, back_category: str = "all", back_page: int = 0):
     rows = [[
-        InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}"),
-        InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}"),
+        InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}"),
+        InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}"),
     ], [
-        InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}"),
+        InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}"),
     ]]
     if owner:
         action = "stop" if status == "running" else "run"
         rows[1].append(InlineKeyboardButton("Stop" if action == "stop" else "Run",
-                                           callback_data=f"hostify:bot:{action}:{name}"))
-        rows.append([InlineKeyboardButton("Delete", callback_data=f"hostify:bot:delete:{name}")])
-    rows.append([InlineKeyboardButton("Back", callback_data="hostify:list:all:0"), _close()])
+                                           callback_data=f"hostify:bot:{action}:{name}:{back_category}:{back_page}"))
+        rows.append([InlineKeyboardButton("Delete", callback_data=f"hostify:bot:delete:{name}:{back_category}:{back_page}")])
+    rows.append([InlineKeyboardButton("Back", callback_data=f"hostify:list:{back_category}:{back_page}"), _close()])
     return InlineKeyboardMarkup(rows)
 
 
@@ -201,6 +201,8 @@ async def bot_callback(client: Client, query):
         await query.answer("Invalid control.", show_alert=True)
         return
     action, name = parts[2], parts[3]
+    back_category = parts[4] if len(parts) > 4 and parts[4] in {"running", "stopped", "all"} else "all"
+    back_page = int(parts[5]) if len(parts) > 5 and parts[5].isdigit() else 0
     if not _NAME.fullmatch(name):
         await query.answer("Invalid bot name.", show_alert=True)
         return
@@ -214,7 +216,7 @@ async def bot_callback(client: Client, query):
         await query.message.edit_text(
             sc(_detail_text(bot)),
             parse_mode=ParseMode.DISABLED,
-            reply_markup=_detail_keyboard(name, owner, str(bot.get("status", "stopped"))),
+            reply_markup=_detail_keyboard(name, owner, str(bot.get("status", "stopped")), back_category, back_page),
             disable_web_page_preview=True,
         )
         await query.answer()
@@ -233,7 +235,7 @@ async def bot_callback(client: Client, query):
             parse_mode=ParseMode.DISABLED,
             reply_markup=_keyboard([
                 [InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}")],
-                [InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}")],
+                [InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")],
             ]),
         )
         await query.answer()
@@ -279,12 +281,12 @@ async def bot_callback(client: Client, query):
         return
 
     if action == "delete" and ok:
-        await query.message.edit_text(sc(result), parse_mode=ParseMode.DISABLED, reply_markup=_keyboard([]))
+        await query.message.edit_text(sc(result), parse_mode=ParseMode.DISABLED, reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:list:{back_category}:{back_page}")]]))
     else:
         updated = await get_bot(name)
         if updated:
             await query.message.edit_text(sc(_detail_text(updated)), parse_mode=ParseMode.DISABLED,
-                reply_markup=_detail_keyboard(name, owner, str(updated.get("status", "stopped"))))
+                reply_markup=_detail_keyboard(name, owner, str(updated.get("status", "stopped")), back_category, back_page))
         else:
             await query.message.edit_text(sc(result), parse_mode=ParseMode.DISABLED, reply_markup=_keyboard([]))
     await query.answer(result[:180], show_alert=not ok)
