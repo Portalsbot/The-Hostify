@@ -15,6 +15,12 @@ MONGO_URI = os.getenv("MONGO_URI", "").strip()
 BASE_DIR = str(Path(os.path.expanduser(os.getenv("BASE_DIR", "~/hostify_bots"))).resolve())
 SESSION_DIR = Path(os.path.expanduser(os.getenv("SESSION_DIR", "./data"))).resolve()
 PORT = int(os.getenv("PORT", "10000"))
+
+# GitHub App credentials. The private key is supplied as Base64 PEM in Render.
+GITHUB_APP_ID = os.getenv("GITHUB_APP_ID", "").strip()
+GITHUB_APP_SLUG = os.getenv("GITHUB_APP_SLUG", "the-hostify").strip()
+GITHUB_APP_PRIVATE_KEY_B64 = os.getenv("GITHUB_APP_PRIVATE_KEY_B64", "").strip()
+GITHUB_APP_PRIVATE_KEY = os.getenv("GITHUB_APP_PRIVATE_KEY", "").strip()
 ALLOW_UNSANDBOXED_DEPLOYMENTS = (
     os.getenv("ALLOW_UNSANDBOXED_DEPLOYMENTS", "false").strip().lower()
     in {"1", "true", "yes", "on"}
