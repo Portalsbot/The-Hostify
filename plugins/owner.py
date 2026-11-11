@@ -97,11 +97,8 @@ async def commands_handler(client: Client, message):
     text = (
         "OWNER COMMANDS\n\n"
         "/commands — Show owner-only commands\n"
-        "/deploy — Deploy a repository (owner and approved admins)\n"
-        "/cancel — Cancel deployment setup\n"
-        "/list — Open deployment dashboard\n"
-        "/stop NAME — Stop a deployed bot\n"
-        "/restart NAME — Restart a deployed bot\n"
+        "/stop NAME — Stop any deployed bot\n"
+        "/restart NAME — Restart any deployed bot\n"
         "/delete NAME — Delete a deployment with confirmation\n"
         "/logs NAME — Show deployment logs\n"
         "/status — Show Hostify resource status\n"
@@ -112,7 +109,6 @@ async def commands_handler(client: Client, message):
         "/resetmsg KEY — Restore a default message\n"
         "/addadmin — Add an administrator by Telegram ID\n"
         "/removeadmin — Select an administrator to remove\n"
-        "/admins — View the admin team\n"
         "/github — Check GitHub App integration"
     )
     await _quote(message, text)
