@@ -23,6 +23,7 @@ from .dashboard import cancel_environment_edit
 from .owner import cancel_brand_edit
 from .message_editor import cancel_message_edit
 from .channel import post_deploy_announcement
+from ui_buttons import button
 
 logger = logging.getLogger("hostify.plugins.deploy_flow")
 
@@ -51,7 +52,7 @@ async def _reply(message, text: str, *, plain: bool = False):
         f"<blockquote>{html.escape(visible)}</blockquote>",
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Close", callback_data="hostify:ui:close")
+            button("Close", callback_data="hostify:ui:close", style="danger")
         ]]),
         disable_web_page_preview=True,
     )
