@@ -140,7 +140,7 @@ async def message_edit_input(client: Client, message):
                 parse_mode=ParseMode.DISABLED,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("Back", callback_data=f"hostify:message:show:{key}"),
-                     InlineKeyboardButton("Close", callback_data="hostify:ui:close")]
+                     button("Close", callback_data="hostify:ui:close", style="danger")]
                 ]),
             )
         except Exception:
