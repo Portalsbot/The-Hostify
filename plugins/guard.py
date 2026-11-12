@@ -3,16 +3,23 @@ from __future__ import annotations
 from pyrogram import filters
 
 from config import OWNER_ID
-from database import is_admin
+from database import is_admin as _database_is_admin
 
 
 def is_owner(user_id):
-    """True only for the configured owner."""
+    """True only for the configured Hostify owner."""
     return bool(OWNER_ID and user_id is not None and user_id == OWNER_ID)
 
 
+async def is_admin(user_id):
+    """Check whether a Telegram account is a registered Hostify admin."""
+    if is_owner(user_id):
+        return False
+    return await _database_is_admin(user_id)
+
+
 async def is_owner_or_admin(user_id):
-    """Authorise deployments and admin features."""
+    """Allow the owner or a registered admin."""
     return is_owner(user_id) or await is_admin(user_id)
 
 
