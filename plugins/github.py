@@ -14,6 +14,7 @@ from github_app import (
 )
 from smallcaps import sc
 from .guard import is_owner, owner_only
+from ui_buttons import button
 
 logger = logging.getLogger("hostify.plugins.github")
 
@@ -25,15 +26,15 @@ def _keyboard(ready: bool) -> InlineKeyboardMarkup:
     if ready:
         return InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("Refresh", callback_data="hostify:github:refresh"),
+                button("Refresh", callback_data="hostify:github:refresh", style="success"),
                 InlineKeyboardButton("Setup Guide", callback_data="hostify:github:guide"),
             ],
-            [InlineKeyboardButton("Close", callback_data="hostify:github:close")],
+            [button("Close", callback_data="hostify:github:close", style="danger")],
         ])
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Open GitHub App", url=_APP_PAGE),
-            InlineKeyboardButton("Install App", url=_INSTALL_PAGE),
+            button("Open GitHub App", url=_APP_PAGE, style="success"),
+            button("Install App", url=_INSTALL_PAGE, style="success"),
         ],
         [InlineKeyboardButton("Setup Guide", callback_data="hostify:github:guide")],
         [InlineKeyboardButton("Close", callback_data="hostify:github:close")],
@@ -179,7 +180,7 @@ async def github_callback(client: Client, query):
             sc(_guide_text()),
             parse_mode=ParseMode.DISABLED,
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Back", callback_data="hostify:github:back"),
+                button("Back", callback_data="hostify:github:back"),
                 InlineKeyboardButton("Close", callback_data="hostify:github:close"),
             ]]),
             disable_web_page_preview=True,
