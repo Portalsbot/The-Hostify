@@ -3,6 +3,8 @@ from __future__ import annotations
 import html
 import logging
 import re
+import secrets
+import time
 from datetime import datetime
 
 from pyrogram import Client, filters
@@ -15,6 +17,7 @@ from smallcaps import sc
 from .guard import is_owner, is_owner_or_admin
 
 logger = logging.getLogger("hostify.plugins.dashboard")
+_pending_delete: dict[str, tuple[int, int, int, str, str, int, float]] = {}
 _NAME = re.compile(r"^[A-Za-z0-9_]{1,32}$")
 _env_sessions: dict[int, tuple[int, str]] = {}
 
@@ -122,17 +125,22 @@ def _detail_text(bot: dict) -> str:
 
 
 def _detail_keyboard(name: str, owner: bool, status: str, back_category: str = "all", back_page: int = 0):
-    rows = [[
-        InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}"),
-        InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}"),
-    ], [
-        InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}"),
-    ]]
+    rows = []
     if owner:
+        rows.append([
+            InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}"),
+            InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}"),
+        ])
         action = "stop" if status == "running" else "run"
-        rows[1].append(InlineKeyboardButton("Stop" if action == "stop" else "Run",
-                                           callback_data=f"hostify:bot:{action}:{name}:{back_category}:{back_page}"))
+        rows.append([
+            InlineKeyboardButton("Stop" if action == "stop" else "Run",
+                                 callback_data=f"hostify:bot:{action}:{name}:{back_category}:{back_page}"),
+            InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}"),
+        ])
         rows.append([InlineKeyboardButton("Delete", callback_data=f"hostify:bot:delete:{name}:{back_category}:{back_page}")])
+    else:
+        rows.append([InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}")])
+        rows.append([InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}")])
     rows.append([InlineKeyboardButton("Back", callback_data=f"hostify:list:{back_category}:{back_page}"), _close()])
     return InlineKeyboardMarkup(rows)
 
@@ -242,6 +250,9 @@ async def bot_callback(client: Client, query):
         return
 
     if action == "env":
+        if not owner:
+            await query.answer("Only the owner can edit deployment environment variables.", show_alert=True)
+            return
         _env_sessions[user.id] = (query.message.chat.id, name)
         await query.message.edit_text(
             sc(f"Send environment variables for {name} as KEY=VALUE, one per line. Use KEY=DELETE to remove a variable. Secret values are encrypted in MongoDB. Send /cancel to abort."),
@@ -253,7 +264,7 @@ async def bot_callback(client: Client, query):
 
     if action == "logs":
         try:
-            lines = await read_logs(name, 40)
+            lines = read_logs(name, 40)
             output = f"LAST {len(lines or [])} LOG LINES: {name}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
             await query.message.edit_text(sc(output[-3800:]), parse_mode=ParseMode.DISABLED,
                 reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}")]]))
@@ -274,8 +285,26 @@ async def bot_callback(client: Client, query):
         ok, detail = await restart_bot(name)
         result = "Deployment started." if ok else f"Could not start deployment: {detail}"
     elif action == "delete":
-        ok, detail = await delete_bot(name)
-        result = "Deployment deleted." if ok else f"Could not delete deployment: {detail}"
+        token = secrets.token_urlsafe(9)
+        _pending_delete[token] = (
+            query.message.chat.id,
+            query.message.id,
+            user.id,
+            name,
+            back_category,
+            back_page,
+            time.monotonic() + 60,
+        )
+        await query.message.edit_text(
+            sc(f"Confirm permanent deletion of {name}? This cannot be undone."),
+            parse_mode=ParseMode.DISABLED,
+            reply_markup=_keyboard([[
+                InlineKeyboardButton("Confirm Delete", callback_data=f"hostify:botdelete:confirm:{token}"),
+                InlineKeyboardButton("Cancel", callback_data=f"hostify:botdelete:cancel:{token}"),
+            ]]),
+        )
+        await query.answer()
+        return
     else:
         await query.answer("Unknown bot action.", show_alert=True)
         return
@@ -304,7 +333,7 @@ def cancel_environment_edit(user_id: int, chat_id: int) -> bool:
 @Client.on_message(filters.private & filters.text & ~filters.regex(r"^/"), group=6)
 async def environment_input(client: Client, message):
     user = message.from_user
-    if not user or user.id not in _env_sessions:
+    if not user or not is_owner(user.id) or user.id not in _env_sessions:
         return
     chat_id, name = _env_sessions[user.id]
     if message.chat.id != chat_id:
@@ -349,9 +378,16 @@ async def environment_input(client: Client, message):
             raise ValueError("No environment variables were provided.")
         if len(env) > 40:
             raise ValueError("A deployment may have at most 40 environment variables.")
+        from deployer import _validate_env_vars
+        env = _validate_env_vars(env)
         await update_bot_env(name, env)
         _env_sessions.pop(user.id, None)
-        await _reply(message, f"Environment updated for {name}. Changed keys: {', '.join(changed)}. A restart is required before the running process receives the changes.")
+        if bot.get("status") == "running":
+            ok, detail = await restart_bot(name)
+            if not ok:
+                await _reply(message, f"Environment saved for {name}, but restart failed: {detail}")
+                return
+        await _reply(message, f"Environment updated for {name}. Changed keys: {', '.join(changed)}.")
     except ValueError as exc:
         await _reply(message, f"{exc} Send the values again, or /cancel to abort.")
     except Exception:
