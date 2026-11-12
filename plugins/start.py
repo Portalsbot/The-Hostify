@@ -87,8 +87,8 @@ async def _commands_text(user_id: int) -> str:
             "/cancel — Cancel deployment setup",
             "/list — View your deployments",
             "/mylogs — View recent Hostify controller logs",
-            "/stopme — Request controller shutdown",
-            "/restartme — Request controller restart",
+            "/stopme — Request a Hostify shutdown",
+            "/restarme — Request a Hostify restart",
         ])
     return "\n".join(lines)
 
@@ -158,10 +158,6 @@ async def command_handler(client: Client, message):
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([_close_row()]),
     )
-
-@Client.on_message(filters.command("admins") & filters.private)
-async def admins_handler(client: Client, message):
-    await _admins_screen(client, message.chat.id, reply_to=message.id)
 
 @Client.on_callback_query(filters.regex(r"^hostify:start:"))
 async def start_navigation(client: Client, query):
