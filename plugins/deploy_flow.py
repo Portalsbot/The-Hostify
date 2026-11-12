@@ -132,7 +132,7 @@ async def deploy_command(client: Client, message):
     await _reply(message, M.M07_ASK_REPO, plain=True)
 
 
-@Client.on_message(filters.command("cancel") & filters.private)
+@Client.on_message(filters.command(["cancel", "cancle"]) & filters.private)
 async def cancel_deploy(client: Client, message):
     user = message.from_user
     if user is None or not await is_owner_or_admin(user.id):
