@@ -4,7 +4,8 @@ import logging
 
 from pyrogram import Client, filters
 from pyrogram.enums import ChatType, ParseMode
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardMarkup
+from ui_buttons import button
 
 from smallcaps import sc
 
@@ -42,7 +43,7 @@ async def ping_handler(client, message):
             sc("Pong. The Hostify controller is receiving Telegram updates."),
             parse_mode=ParseMode.DISABLED,
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Close", callback_data="hostify:ui:close")
+                button("Close", callback_data="hostify:ui:close", style="danger")
             ]]),
         )
         logger.info("PING TEST SUCCESSFUL")
