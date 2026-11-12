@@ -8,7 +8,7 @@ from pathlib import Path
 from aiohttp import web
 from pyrogram import Client, idle
 
-from config import API_ID, API_HASH, BOT_TOKEN, SESSION_DIR, PORT, BASE_DIR
+from config import API_ID, API_HASH, BOT_TOKEN, SESSION_DIR, PORT, BASE_DIR, OWNER_ID
 from database import close_database, verify_database_connection
 from branding import load_branding
 from utils import load_message_templates
@@ -95,7 +95,7 @@ async def main() -> None:
         from database import get_admins
         try:
             await sync_default_commands()
-            await sync_user_commands(me.id, "owner")
+            await sync_user_commands(OWNER_ID, "owner")
             for admin in await get_admins():
                 admin_id = admin.get("user_id")
                 if isinstance(admin_id, int) and admin_id > 0:
