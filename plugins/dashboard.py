@@ -226,6 +226,9 @@ async def bot_callback(client: Client, query):
         await query.answer("This deployment is not available to your account.", show_alert=True)
         return
     owner = is_owner(user.id)
+    pending_env = _env_sessions.get(user.id)
+    if action != "env" and pending_env is not None and pending_env[0] == query.message.chat.id:
+        _env_sessions.pop(user.id, None)
 
     if action == "view":
         await query.message.edit_text(
@@ -284,7 +287,7 @@ async def bot_callback(client: Client, query):
         if len(lines) == 3:
             lines.append("No environment variables are configured.")
         await query.message.edit_text(
-            "\n".join(lines),
+            "<blockquote>" + "\n".join(lines) + "</blockquote>",
             parse_mode=ParseMode.HTML,
             reply_markup=_keyboard([
                 [button("Hide Values", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}")],
