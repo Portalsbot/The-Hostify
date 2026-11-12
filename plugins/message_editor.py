@@ -56,6 +56,7 @@ def _list_markup(page: int):
         nav.append(InlineKeyboardButton("Next", callback_data=f"hostify:message:list:{page+1}"))
     if nav:
         rows.append(nav)
+    rows.append([InlineKeyboardButton("Back", callback_data="hostify:settings:open")])
     rows.append([button("Close", callback_data="hostify:ui:close", style="danger")])
     return InlineKeyboardMarkup(rows), page, total_pages
 
@@ -64,9 +65,9 @@ async def _show_list(target, page: int, *, edit: bool):
     markup, page, total = _list_markup(page)
     text = f"Click any button to edit a message.\n\nPage {page + 1} of {total}."
     if edit:
-        await target.edit_text(sc(text), parse_mode=ParseMode.DISABLED, reply_markup=markup)
+        await target.edit_text(f"<blockquote>{html.escape(sc(text))}</blockquote>", parse_mode=ParseMode.HTML, reply_markup=markup)
     else:
-        await target.reply_text(sc(text), parse_mode=ParseMode.DISABLED, reply_markup=markup)
+        await target.reply_text(f"<blockquote>{html.escape(sc(text))}</blockquote>", parse_mode=ParseMode.HTML, reply_markup=markup)
 
 
 def _show_markup(key: str):
