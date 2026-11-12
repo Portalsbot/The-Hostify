@@ -112,3 +112,8 @@ Admins can view and manage only deployments they created: they can edit their en
 - `GET /health`
 
 The endpoint reports `starting` until the Telegram client connects, then `ok`.
+
+
+## Planned Docker Engine integration (not enabled)
+
+The `/docker` command is intentionally not registered yet. When implemented, it will connect Hostify to a Docker Engine that you control, verify the connection, and manage isolated project containers. It will require a Docker endpoint plus secure TLS client credentials (CA certificate, client certificate and client key) for a remote VPS. Do not expose an unauthenticated Docker TCP port; Docker daemon access is effectively host-root access. The future setup wizard should offer Connect, Test Connection, Runtime Status, Disconnect and Close actions, with the endpoint and certificate instructions shown inside Telegram. Hostify itself will continue to run as a native Python service on Render.
