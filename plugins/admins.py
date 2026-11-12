@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import logging
 import re
 
@@ -24,9 +25,10 @@ def _name(user: dict) -> str:
 
 async def _reply(message, text: str, markup=None):
     return await message.reply_text(
-        sc(text),
-        parse_mode=ParseMode.DISABLED,
+        f"<blockquote>{html.escape(sc(text))}</blockquote>",
+        parse_mode=ParseMode.HTML,
         reply_markup=markup or _CLOSE,
+        disable_web_page_preview=True,
     )
 
 
@@ -78,8 +80,8 @@ async def addadmin_input(client: Client, message):
         try:
             await client.send_message(
                 admin_id,
-                sc("You are now also my admin! Send /start to open Hostify."),
-                parse_mode=ParseMode.DISABLED,
+                f"<blockquote>{html.escape(sc('You are now also my admin! Send /start to open Hostify.'))}</blockquote>",
+                parse_mode=ParseMode.HTML,
                 reply_markup=markup,
             )
             notification = "Admin added successfully. The new admin has been notified."
@@ -165,8 +167,8 @@ async def removeadmin_callback(client: Client, query):
         try:
             await client.send_message(
                 admin_id,
-                sc("Your Hostify administrator access has been removed."),
-                parse_mode=ParseMode.DISABLED,
+                f"<blockquote>{html.escape(sc('Your Hostify administrator access has been removed.'))}</blockquote>",
+                parse_mode=ParseMode.HTML,
                 reply_markup=_CLOSE,
             )
         except Exception:
