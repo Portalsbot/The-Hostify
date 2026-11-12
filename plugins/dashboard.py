@@ -20,7 +20,7 @@ from .guard import is_owner, is_owner_or_admin
 logger = logging.getLogger("hostify.plugins.dashboard")
 _pending_delete: dict[str, tuple[int, int, int, str, str, int, float]] = {}
 _NAME = re.compile(r"^[A-Za-z0-9_]{1,32}$")
-_env_sessions: dict[int, tuple[int, str]] = {}
+_env_sessions: dict[int, tuple[int, str, int, str, int]] = {}
 
 
 def _close():
@@ -33,7 +33,7 @@ def _keyboard(rows):
     return InlineKeyboardMarkup(rows)
 
 
-async def _quoted(text: str) -> str:
+def _quoted(text: str) -> str:
     return f"<blockquote>{html.escape(sc(text))}</blockquote>"
 
 
@@ -302,7 +302,7 @@ async def bot_callback(client: Client, query):
         if not owner:
             await query.answer("Only the owner can edit deployment environment variables.", show_alert=True)
             return
-        _env_sessions[user.id] = (query.message.chat.id, name)
+        _env_sessions[user.id] = (query.message.chat.id, name, query.message.id, back_category, back_page)
         await query.message.edit_text(
             _quoted(f"Send environment variables for {name} as KEY=VALUE, one per line. Use KEY=DELETE to remove a variable. Secret values are encrypted in MongoDB. Send /cancel to abort."),
             parse_mode=ParseMode.HTML,
@@ -434,21 +434,30 @@ async def environment_input(client: Client, message):
     user = message.from_user
     if not user or not is_owner(user.id) or user.id not in _env_sessions:
         return
-    chat_id, name = _env_sessions[user.id]
+    chat_id, name, prompt_id, back_category, back_page = _env_sessions[user.id]
     if message.chat.id != chat_id:
         return
     if not await is_owner_or_admin(user.id):
         _env_sessions.pop(user.id, None)
         return
+    prompt = await client.get_messages(chat_id, prompt_id)
     if message.text.strip().casefold() == "cancel":
         _env_sessions.pop(user.id, None)
-        await _reply(message, "Environment editing cancelled.")
+        await prompt.edit_text(
+            _quoted("Environment editing cancelled."),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]),
+        )
         return
 
     bot = await get_bot(name)
     if not bot or not _can_view(user.id, bot):
         _env_sessions.pop(user.id, None)
-        await _reply(message, "This deployment is no longer available.")
+        await prompt.edit_text(
+            _quoted("This deployment is no longer available."),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_keyboard([]),
+        )
         return
     env = dict(bot.get("env_vars") or {})
     changed = []
@@ -480,16 +489,33 @@ async def environment_input(client: Client, message):
         from deployer import _validate_env_vars
         env = _validate_env_vars(env)
         await update_bot_env(name, env)
-        _env_sessions.pop(user.id, None)
         if bot.get("status") == "running":
             ok, detail = await restart_bot(name)
             if not ok:
-                await _reply(message, f"Environment saved for {name}, but restart failed: {detail}")
+                _env_sessions.pop(user.id, None)
+                await prompt.edit_text(
+                    _quoted(f"Environment saved for {name}, but restart failed: {detail}"),
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]),
+                )
                 return
-        await _reply(message, f"Environment updated for {name}. Changed keys: {', '.join(changed)}.")
+        _env_sessions.pop(user.id, None)
+        await prompt.edit_text(
+            _quoted(f"Environment updated for {name}. Changed keys: {', '.join(changed)}."),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]),
+        )
     except ValueError as exc:
-        await _reply(message, f"{exc} Send the values again, or /cancel to abort.")
+        await prompt.edit_text(
+            _quoted(f"{exc} Send the values again, or /cancel to abort."),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]),
+        )
     except Exception:
         logger.exception("Environment update failed for %s", name)
         _env_sessions.pop(user.id, None)
-        await _reply(message, "Could not save environment changes. Check controller logs.")
+        await prompt.edit_text(
+            _quoted("Could not save environment changes. Check controller logs."),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]),
+        )
