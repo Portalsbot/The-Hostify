@@ -36,7 +36,8 @@ def _start_keyboard():
     return InlineKeyboardMarkup([
         [_btn("About", "hostify:start:about")],
         [_btn("Help", "hostify:start:help")],
-        [_btn("Channel", "hostify:start:channel"), _btn("Commands", "hostify:start:commands")],
+        [_btn("Channel", "hostify:start:channel")],
+        [_btn("Commands", "hostify:start:commands")],
         _close_row(),
     ])
 
@@ -126,6 +127,11 @@ async def start_handler(client: Client, message):
     try:
         from database import register_user
         await register_user(user.id, username=user.username or "", first_name=user.first_name or "")
+        from command_menu import sync_user_commands
+        if is_owner(user.id):
+            await sync_user_commands(user.id, "owner")
+        elif await is_admin(user.id):
+            await sync_user_commands(user.id, "admin")
         await message.reply_text(
             _styled_html(_start_text()),
             parse_mode=ParseMode.HTML,
