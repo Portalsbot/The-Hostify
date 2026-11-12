@@ -24,7 +24,7 @@ _env_sessions: dict[int, tuple[int, str]] = {}
 
 
 def _close():
-    return InlineKeyboardButton("Close", callback_data="hostify:ui:close")
+    return button("Close", callback_data="hostify:ui:close", style="danger")
 
 
 def _keyboard(rows):
@@ -242,7 +242,7 @@ async def bot_callback(client: Client, query):
         rows = []
         if owner:
             rows.append([button("Reveal Values", callback_data=f"hostify:bot:envshow:{name}:{back_category}:{back_page}", style="primary")])
-        rows.append([button("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}", style="success")])
+            rows.append([button("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}", style="success")])
         rows.append([button("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")])
         await query.message.edit_text(
             sc("\n".join(lines)),
