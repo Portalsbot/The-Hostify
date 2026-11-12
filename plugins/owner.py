@@ -144,6 +144,7 @@ async def _settings_screen(message):
             _button("Admins", "hostify:settings:admins"),
         ],
         [_button("GitHub Integration", "hostify:settings:github")],
+        [_button("System Status", "hostify:settings:status")],
     ]
     await _edit(message, "HOSTIFY SETTINGS\n\n" + "\n".join(fields), markup=_keyboard(rows))
 
@@ -393,6 +394,28 @@ async def settings_callback(client: Client, query):
         await _settings_screen(query.message)
     elif action == "branding":
         await _edit(query.message, "Select a branding field to edit.", markup=_brand_keyboard())
+    elif action == "status":
+        try:
+            cpu = await asyncio.to_thread(psutil.cpu_percent, interval=0.2)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage(str(BASE_DIR))
+            from database import list_bots, verify_database_connection
+            await verify_database_connection()
+            bots = await list_bots(limit=2000)
+            running = sum(1 for bot in bots if bot.get("status") == "running")
+            overview = (
+                "HOSTIFY SYSTEM OVERVIEW\\n\\n"
+                f"Python: {__import__('sys').version.split()[0]}\\n"
+                f"CPU: {cpu:.1f}%\\n"
+                f"RAM: {memory.used / 1024**2:.0f} / {memory.total / 1024**2:.0f} MB\\n"
+                f"Storage: {disk.used / 1024**3:.1f} / {disk.total / 1024**3:.1f} GB\\n"
+                f"Deployments: {running} running / {len(bots)} total\\n"
+                "Database: Connected"
+            )
+        except Exception:
+            logger.exception("System overview check failed")
+            overview = "HOSTIFY SYSTEM OVERVIEW\\n\\nDatabase or system metrics could not be collected. Check Hostify logs."
+        await _edit(query.message, overview, markup=_keyboard([[_button("Back", "hostify:settings:open")]]))
     elif action == "github":
         await _edit(
             query.message,
