@@ -157,6 +157,9 @@ async def message_editor_callback(client: Client, query):
     parts = (query.data or "").split(":")
     action = parts[2] if len(parts) > 2 else ""
     value = parts[3] if len(parts) > 3 else "0"
+    pending = _pending_edit.get(user.id)
+    if action != "edit" and pending is not None and pending[0] == query.message.chat.id:
+        _pending_edit.pop(user.id, None)
 
     if action in {"list", "back"}:
         page = int(value) if value.isdigit() else 0
@@ -194,7 +197,7 @@ async def message_editor_callback(client: Client, query):
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Back", callback_data=f"hostify:message:show:{key}"),
-                 InlineKeyboardButton("Close", callback_data="hostify:ui:close")]
+                 button("Close", callback_data="hostify:ui:close", style="danger")]
             ]),
             disable_web_page_preview=True,
         )
