@@ -110,7 +110,7 @@ async def _admins_screen(client: Client, chat_id: int, *, reply_to=None):
             row = []
     if row:
         buttons.append(row)
-    buttons.append([_btn("Back", "hostify:start:back"), _btn("Close", "hostify:ui:close")])
+    buttons.append([_btn("Back", "hostify:start:back"), button("Close", callback_data="hostify:ui:close", style="danger")])
     await client.send_message(
         chat_id,
         _styled_html(text),
