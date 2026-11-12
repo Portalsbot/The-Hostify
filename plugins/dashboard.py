@@ -276,7 +276,7 @@ async def bot_callback(client: Client, query):
         env = bot.get("env_vars") or {}
         lines = [
             f"<b>RUNNING ENVIRONMENT / API VALUES: {html.escape(name)}</b>",
-            "<i>These values are visible only to the owner in this private chat.</i>",
+            "<i>These values are visible only to the owner or the admin who owns this deployment.</i>",
             "",
         ]
         used = sum(len(line) for line in lines)
