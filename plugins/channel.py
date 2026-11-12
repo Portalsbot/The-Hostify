@@ -15,6 +15,7 @@ from database import get_bot
 from manager import restart_bot, stop_bot
 from utils import format_output
 from .guard import is_owner
+from ui_buttons import button
 
 logger = logging.getLogger("hostify.plugins.channel")
 
@@ -28,10 +29,10 @@ async def _answer(callback: CallbackQuery, text: object, **kwargs):
 def _action_keyboard(name: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(format_output(M.M108_BTN_RESTART), callback_data=f"hc:restart:{name}"),
-            InlineKeyboardButton(format_output(M.M109_BTN_STOP), callback_data=f"hc:stop:{name}"),
+            button(format_output(M.M108_BTN_RESTART), callback_data=f"hc:restart:{name}", style="success"),
+            button(format_output(M.M109_BTN_STOP), callback_data=f"hc:stop:{name}", style="danger"),
         ],
-        [InlineKeyboardButton("Close", callback_data="hostify:ui:close")],
+        [button("Close", callback_data="hostify:ui:close", style="danger")],
     ])
 
 
