@@ -447,7 +447,7 @@ async def unknown_owner_command(client: Client, message):
     known = {
         "start", "command", "commands", "admins", "deploy", "cancel", "list",
         "stop", "restart", "delete", "logs", "status", "ping", "settings",
-        "setting", "setbrand", "messageonly", "messages", "setmsg", "resetmsg",
+        "setting", "setbrand", "messageonly", "setmsg", "resetmsg",
         "addadmin", "removeadmin", "github", "mylogs", "restarme", "stopme",
     }
     if command and command not in known:
