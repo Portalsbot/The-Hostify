@@ -10,6 +10,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import messages as M
 from smallcaps import sc
+from ui_buttons import button
 from .guard import is_owner
 
 logger = logging.getLogger("hostify.plugins.message_editor")
@@ -24,7 +25,7 @@ def _label(key: str) -> str:
 
 
 def _close():
-    return [InlineKeyboardButton("Close", callback_data="hostify:ui:close")]
+    return [button("Close", callback_data="hostify:ui:close", style="danger")]
 
 
 def _styled_html(value: str) -> str:
@@ -70,8 +71,8 @@ async def _show_list(target, page: int, *, edit: bool):
 
 def _show_markup(key: str):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Edit Text", callback_data=f"hostify:message:edit:{key}")],
-        [InlineKeyboardButton("Reset Default", callback_data=f"hostify:message:reset:{key}")],
+        [button("Edit Text", callback_data=f"hostify:message:edit:{key}", style="success")],
+        [button("Reset Default", callback_data=f"hostify:message:reset:{key}", style="danger")],
         [InlineKeyboardButton("Back", callback_data="hostify:message:back:0"),
          InlineKeyboardButton("Close", callback_data="hostify:ui:close")],
     ])
