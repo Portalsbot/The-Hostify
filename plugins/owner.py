@@ -402,6 +402,8 @@ async def settings_callback(client: Client, query):
     elif action == "github_refresh":
         await _edit(query.message, "Send /github to refresh the GitHub integration screen.")
     elif action == "admins":
+        from .admins import cancel_admin_add
+        cancel_admin_add(user.id, query.message.chat.id)
         await _edit(
             query.message,
             "ADMIN MANAGEMENT\\n\\nAdd a trusted administrator, remove existing access, or view the current admin team.",
