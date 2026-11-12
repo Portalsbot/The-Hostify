@@ -101,7 +101,7 @@ Admins can view and manage only deployments they created: they can edit their en
 - Public repositories can be cloned anonymously. Selected private repositories use short-lived GitHub App installation tokens.
 - Each deployment's environment variables are encrypted in MongoDB.
 - Each deployment is recorded with the Telegram user ID of the admin who created it.
-- Owners can manage all deployments. Admins can view their own deployments and cannot stop, restart or delete them.
+- Owners can view and manage every deployment. Admins can view, edit environment variables, run, stop, restart and delete only deployments they created; they cannot access another admin's or the owner's deployments.
 - `ALLOW_UNSANDBOXED_DEPLOYMENTS=false` is the safe default. Enabling it allows trusted admin-submitted Python code to execute under the Hostify service account. This is **not a sandbox**. Only enable it when every admin and repository is trusted.
 - Docker Engine integration for customer projects, Java runtime deployment, and isolated per-project containers are not implemented in this version. The `/docker` command is intentionally not registered.
 - Controller shutdown/restart commands rely on the hosting provider's process restart behaviour. Use the Render dashboard to suspend or manually restart the service when required.
