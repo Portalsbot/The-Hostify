@@ -22,7 +22,7 @@ from utils import format_output
 from .guard import is_owner
 
 logger = logging.getLogger("hostify.plugins.owner")
-_PENDING_BRAND: dict[int, tuple[int, str]] = {}
+_PENDING_BRAND: dict[int, tuple[int, str, int]] = {}
 _PENDING_DELETE: dict[str, tuple[int, int, str, float]] = {}
 _DELETE_TTL = 60
 _LOG_LIMIT = 3_600
@@ -402,7 +402,18 @@ async def settings_callback(client: Client, query):
     elif action == "github_refresh":
         await _edit(query.message, "Send /github to refresh the GitHub integration screen.")
     elif action == "admins":
-        await _edit(query.message, "Use /admins to view the admin team, /addadmin to add an admin, or /removeadmin to remove one.")
+        await _edit(
+            query.message,
+            "ADMIN MANAGEMENT\\n\\nAdd a trusted administrator, remove existing access, or view the current admin team.",
+            markup=_keyboard([
+                [
+                    _button("Add Admin", "hostify:adminpanel:add", style="success"),
+                    _button("Remove Admin", "hostify:adminpanel:remove", style="danger"),
+                ],
+                [_button("View Admins", "hostify:adminpanel:view")],
+                [_button("Back", "hostify:settings:open")],
+            ]),
+        )
     await query.answer()
 
 
@@ -416,7 +427,7 @@ async def brand_edit_callback(client: Client, query):
     if field not in DEFAULT_BRANDING:
         await query.answer("Unknown branding field.", show_alert=True)
         return
-    _PENDING_BRAND[user.id] = (query.message.chat.id, field)
+    _PENDING_BRAND[user.id] = (query.message.chat.id, field, query.message.id)
     await _edit(query.message, f"Send the new value for {field}. Use /cancel to abort.")
     await query.answer()
 
@@ -430,12 +441,19 @@ async def brand_value_input(client: Client, message):
     if not pending or pending[0] != message.chat.id:
         return
     field = pending[1]
+    prompt_id = pending[2]
     try:
         value = await set_brand_value(field, message.text.strip())
         _PENDING_BRAND.pop(user.id, None)
-        await _reply(message, f"{field} updated successfully: {value}.")
+        prompt = await client.get_messages(message.chat.id, prompt_id)
+        await _edit(
+            prompt,
+            f"{field} updated successfully: {value}.",
+            markup=_keyboard([[_button("Back to Branding", "hostify:settings:branding")]]),
+        )
     except ValueError as exc:
-        await _reply(message, f"Invalid value: {exc}. Send it again or /cancel.")
+        prompt = await client.get_messages(message.chat.id, prompt_id)
+        await _edit(prompt, f"Invalid value: {exc}. Send it again or /cancel.")
 
 
 @Client.on_message(filters.private, group=10)
