@@ -72,7 +72,7 @@ Use `/github` in the owner account to check the connection and list accessible r
 | `/restarme` | Request a controller restart |
 | `/stopme` | Request a controller shutdown |
 
-Admins cannot stop, restart, delete or edit deployment environment variables. The owner can view and manage every deployment.
+Admins can view and manage only deployments they created: they can edit their environment and use Run, Stop, Restart and Delete on those deployments. They cannot access or control another admin's deployments. The owner can view and manage every deployment.
 
 ### Owner-only commands
 
