@@ -83,14 +83,6 @@ async def messageonly_command(client: Client, message):
     await _show_list(message, 0, edit=False)
 
 
-@Client.on_message(filters.command("messages") & filters.private)
-async def messages_alias(client: Client, message):
-    user = message.from_user
-    if not user or not is_owner(user.id):
-        return
-    await _show_list(message, 0, edit=False)
-
-
 @Client.on_callback_query(filters.regex(r"^hostify:message:"))
 async def message_editor_callback(client: Client, query):
     user = query.from_user
