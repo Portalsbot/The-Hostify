@@ -22,12 +22,15 @@ ADMIN_COMMANDS = PUBLIC_COMMANDS + [
     {"command": "cancel", "description": "Cancel the current setup"},
     {"command": "list", "description": "View your deployments"},
     {"command": "mylogs", "description": "View recent Hostify controller logs"},
-    {"command": "restartme", "description": "Request a Hostify restart"},
+    {"command": "restarme", "description": "Request a Hostify restart"},
     {"command": "stopme", "description": "Request a Hostify shutdown"},
 ]
 
-OWNER_COMMANDS = ADMIN_COMMANDS + [
+OWNER_COMMANDS = PUBLIC_COMMANDS + [
     {"command": "commands", "description": "View owner-only commands"},
+    {"command": "deploy", "description": "Deploy a permitted Python repository"},
+    {"command": "cancel", "description": "Cancel the current setup"},
+    {"command": "list", "description": "View every deployment"},
     {"command": "stop", "description": "Stop a deployed bot"},
     {"command": "restart", "description": "Restart a deployed bot"},
     {"command": "delete", "description": "Delete a deployed bot"},
