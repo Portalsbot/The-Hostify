@@ -21,6 +21,7 @@ from .guard import is_owner_or_admin
 from .admins import cancel_admin_add
 from .dashboard import cancel_environment_edit
 from .owner import cancel_brand_edit
+from .message_editor import cancel_message_edit
 from .channel import post_deploy_announcement
 
 logger = logging.getLogger("hostify.plugins.deploy_flow")
@@ -144,6 +145,9 @@ async def cancel_deploy(client: Client, message):
         return
     if cancel_brand_edit(user.id, message.chat.id):
         await _reply(message, "Branding edit cancelled.")
+        return
+    if cancel_message_edit(user.id, message.chat.id):
+        await _reply(message, "Message editing cancelled.")
         return
 
     async with _session_lock:
