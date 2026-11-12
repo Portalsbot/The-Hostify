@@ -46,6 +46,14 @@ class PluginImportTests(unittest.TestCase):
         self.assertNotIn("help", [item["command"] for item in menu.PUBLIC_COMMANDS])
         self.assertIn("deploy", [item["command"] for item in menu.ADMIN_COMMANDS])
         self.assertIn("commands", [item["command"] for item in menu.OWNER_COMMANDS])
+        self.assertIn("restarme", [item["command"] for item in menu.ADMIN_COMMANDS])
+        self.assertNotIn("restartme", [item["command"] for item in menu.ADMIN_COMMANDS])
+        self.assertNotIn("help", [item["command"] for item in menu.ADMIN_COMMANDS])
+        self.assertIn("messageonly", [item["command"] for item in menu.OWNER_COMMANDS])
+        self.assertIn("addadmin", [item["command"] for item in menu.OWNER_COMMANDS])
+        self.assertIn("github", [item["command"] for item in menu.OWNER_COMMANDS])
+        self.assertNotIn("messages", [item["command"] for item in menu.OWNER_COMMANDS])
+        self.assertNotIn("docker", [item["command"] for item in menu.OWNER_COMMANDS])
 
 
 if __name__ == "__main__":
