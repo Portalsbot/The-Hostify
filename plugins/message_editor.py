@@ -56,7 +56,7 @@ def _list_markup(page: int):
         nav.append(InlineKeyboardButton("Next", callback_data=f"hostify:message:list:{page+1}"))
     if nav:
         rows.append(nav)
-    rows.append([InlineKeyboardButton("Close", callback_data="hostify:ui:close")])
+    rows.append([button("Close", callback_data="hostify:ui:close", style="danger")])
     return InlineKeyboardMarkup(rows), page, total_pages
 
 
