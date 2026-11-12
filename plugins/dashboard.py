@@ -229,6 +229,7 @@ async def bot_callback(client: Client, query):
         await query.answer("This deployment is not available to your account.", show_alert=True)
         return
     owner = is_owner(user.id)
+    can_manage = _can_view(user.id, bot)
     pending_env = _env_sessions.get(user.id)
     if action != "env" and pending_env is not None and pending_env[0] == query.message.chat.id:
         _env_sessions.pop(user.id, None)
@@ -237,7 +238,7 @@ async def bot_callback(client: Client, query):
         await query.message.edit_text(
             _quoted(_detail_text(bot)),
             parse_mode=ParseMode.HTML,
-            reply_markup=_detail_keyboard(name, owner, str(bot.get("status", "stopped")), back_category, back_page),
+            reply_markup=_detail_keyboard(name, can_manage, str(bot.get("status", "stopped")), back_category, back_page),
             disable_web_page_preview=True,
         )
         await query.answer()
@@ -254,6 +255,7 @@ async def bot_callback(client: Client, query):
         rows = []
         if owner:
             rows.append([button("Reveal Values", callback_data=f"hostify:bot:envshow:{name}:{back_category}:{back_page}", style="primary")])
+        if can_manage:
             rows.append([button("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}", style="success")])
         rows.append([button("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")])
         await query.message.edit_text(
@@ -302,8 +304,8 @@ async def bot_callback(client: Client, query):
         return
 
     if action == "env":
-        if not owner:
-            await query.answer("Only the owner can edit deployment environment variables.", show_alert=True)
+        if not can_manage:
+            await query.answer("You can only edit deployments assigned to your account.", show_alert=True)
             return
         _env_sessions[user.id] = (query.message.chat.id, name, query.message.id, back_category, back_page)
         await query.message.edit_text(
@@ -326,8 +328,8 @@ async def bot_callback(client: Client, query):
             await query.answer("Could not read these logs.", show_alert=True)
         return
 
-    if not owner:
-        await query.answer("Only the owner can stop, run, restart or delete deployments.", show_alert=True)
+    if not can_manage:
+        await query.answer("You can only control deployments assigned to your account.", show_alert=True)
         return
 
     if action == "stop":
@@ -380,8 +382,8 @@ async def bot_callback(client: Client, query):
 async def bot_delete_confirmation(client: Client, query):
     user = query.from_user
     message = query.message
-    if not user or not is_owner(user.id) or message is None:
-        await query.answer("Only the owner can delete deployments.", show_alert=True)
+    if not user or message is None:
+        await query.answer("This deletion control is unavailable.", show_alert=True)
         return
     parts = (query.data or "").split(":")
     if len(parts) != 4:
@@ -393,11 +395,14 @@ async def bot_delete_confirmation(client: Client, query):
         await query.answer("Confirmation expired. Open /list and try again.", show_alert=True)
         return
     chat_id, message_id, owner_id, name, category, page, expiry = pending
+    target_bot = await get_bot(name)
     if (
         chat_id != message.chat.id
         or message_id != message.id
         or owner_id != user.id
         or time.monotonic() > expiry
+        or not target_bot
+        or not _can_view(user.id, target_bot)
     ):
         await query.answer("This confirmation expired or belongs to another user.", show_alert=True)
         return
@@ -438,7 +443,7 @@ def cancel_environment_edit(user_id: int, chat_id: int) -> bool:
 @Client.on_message(filters.private & filters.text & ~filters.regex(r"^/"), group=6)
 async def environment_input(client: Client, message):
     user = message.from_user
-    if not user or not is_owner(user.id) or user.id not in _env_sessions:
+    if not user or user.id not in _env_sessions:
         return
     chat_id, name, prompt_id, back_category, back_page = _env_sessions[user.id]
     if message.chat.id != chat_id:
