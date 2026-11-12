@@ -111,35 +111,90 @@ def cancel_admin_add(user_id: int, chat_id: int) -> bool:
     return True
 
 
+async def _admin_remove_keyboard(admins):
+    rows = []
+    for admin in admins:
+        admin_id = int(admin.get("user_id", 0))
+        if admin_id <= 0:
+            continue
+        rows.append([
+            button(_name(admin)[:28], url=f"tg://user?id={admin_id}"),
+            button("Remove", callback_data=f"hostify:admin:remove:{admin_id}", style="danger"),
+        ])
+    rows.append([button("Back", callback_data="hostify:settings:admins")])
+    rows.append([button("Close", callback_data="hostify:ui:close", style="danger")])
+    return InlineKeyboardMarkup(rows)
+
+
+async def _render_admin_remove_list(target):
+    admins = await get_admins()
+    text = "Select the admin you want to remove, senpai." if admins else "There are no admins to remove."
+    await target.edit_text(
+        f"<blockquote>{html.escape(sc(text))}</blockquote>",
+        parse_mode=ParseMode.HTML,
+        reply_markup=await _admin_remove_keyboard(admins),
+    )
+
+
 @Client.on_message(filters.command("removeadmin") & filters.private)
 async def removeadmin_command(client: Client, message):
     user = message.from_user
     if not user or not is_owner(user.id):
         return
     admins = await get_admins()
-    if not admins:
-        await _reply(message, "There are no admins to remove.")
-        return
-
-    rows = []
-    row = []
-    for admin in admins:
-        admin_id = int(admin.get("user_id", 0))
-        if not admin_id:
-            continue
-        label = _name(admin)[:28]
-        row.extend([
-            InlineKeyboardButton(label, url=f"tg://user?id={admin_id}"),
-            button("Remove", callback_data=f"hostify:admin:remove:{admin_id}", style="danger"),
-        ])
-        rows.append(row)
-        row = []
-    rows.append([InlineKeyboardButton("Close", callback_data="hostify:ui:close")])
+    text = "Select the admin you want to remove, senpai." if admins else "There are no admins to remove."
     await message.reply_text(
-        f"<blockquote>{sc('Select the admin you want to remove, senpai.')}</blockquote>",
+        f"<blockquote>{html.escape(sc(text))}</blockquote>",
         parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(rows),
+        reply_markup=await _admin_remove_keyboard(admins),
     )
+
+
+@Client.on_callback_query(filters.regex(r"^hostify:adminpanel:"))
+async def admin_panel_callback(client: Client, query):
+    user = query.from_user
+    message = query.message
+    if not user or not is_owner(user.id) or message is None:
+        await query.answer("Owner access required.", show_alert=True)
+        return
+    action = (query.data or "").rsplit(":", 1)[-1]
+    if action == "add":
+        _pending_add[user.id] = message.chat.id
+        await message.edit_text(
+            f"<blockquote>{html.escape(sc('Send me the new admin ID.'))}</blockquote>",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[
+                button("Back", callback_data="hostify:settings:admins"),
+                button("Close", callback_data="hostify:ui:close", style="danger"),
+            ]]),
+        )
+    elif action == "remove":
+        await _render_admin_remove_list(message)
+    elif action == "view":
+        admins = await get_admins()
+        rows, row = [], []
+        for admin in admins:
+            admin_id = int(admin.get("user_id", 0))
+            if admin_id <= 0:
+                continue
+            row.append(button(_name(admin)[:32], url=f"tg://user?id={admin_id}"))
+            if len(row) == 2:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([button("Back", callback_data="hostify:settings:admins")])
+        rows.append([button("Close", callback_data="hostify:ui:close", style="danger")])
+        text = "These are my admins." if admins else "No admins have been added yet."
+        await message.edit_text(
+            f"<blockquote>{html.escape(sc(text))}</blockquote>",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(rows),
+        )
+    else:
+        await query.answer("Unknown admin action.", show_alert=True)
+        return
+    await query.answer()
 
 
 @Client.on_callback_query(filters.regex(r"^hostify:admin:remove:\d+$"))
@@ -159,11 +214,7 @@ async def removeadmin_callback(client: Client, query):
             return
         await query.answer("Admin removed.")
         if query.message:
-            await query.message.edit_text(
-                sc(f"Admin {admin_id} has been removed successfully."),
-                parse_mode=ParseMode.DISABLED,
-                reply_markup=_CLOSE,
-            )
+            await _render_admin_remove_list(query.message)
         try:
             await client.send_message(
                 admin_id,
