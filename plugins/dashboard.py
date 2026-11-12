@@ -134,8 +134,9 @@ def _detail_keyboard(name: str, owner: bool, status: str, back_category: str = "
         ])
         action = "stop" if status == "running" else "run"
         rows.append([
-            InlineKeyboardButton("Stop" if action == "stop" else "Run",
-                                 callback_data=f"hostify:bot:{action}:{name}:{back_category}:{back_page}", style="success" if action == "run" else "danger"),
+            button("Stop" if action == "stop" else "Run",
+                   callback_data=f"hostify:bot:{action}:{name}:{back_category}:{back_page}",
+                   style="success" if action == "run" else "danger"),
             InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}"),
         ])
         rows.append([button("Delete", callback_data=f"hostify:bot:delete:{name}:{back_category}:{back_page}", style="danger")])
