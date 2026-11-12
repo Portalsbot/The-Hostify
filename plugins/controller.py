@@ -92,7 +92,7 @@ async def mylogs_command(client: Client, message):
     if not path.is_file():
         await message.reply_text(
             f"<blockquote>{html.escape(sc('Hostify log file is not available yet.'))}</blockquote>",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]),
+            reply_markup=InlineKeyboardMarkup([[button("Close", callback_data="hostify:ui:close", style="danger")]]),
             parse_mode=ParseMode.HTML,
         )
         return
