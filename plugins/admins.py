@@ -10,11 +10,12 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database import add_admin, get_admins, remove_admin
 from smallcaps import sc
 from .guard import is_owner
+from ui_buttons import button
 
 logger = logging.getLogger("hostify.plugins.admins")
 
 _pending_add: dict[int, int] = {}
-_CLOSE = InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]])
+_CLOSE = InlineKeyboardMarkup([[button("Close", callback_data="hostify:ui:close", style="danger")]])
 
 
 def _name(user: dict) -> str:
@@ -71,7 +72,7 @@ async def addadmin_input(client: Client, message):
         bot_username = (await client.get_me()).username
         start_url = f"https://t.me/{bot_username}?start=admin"
         markup = InlineKeyboardMarkup([[
-            InlineKeyboardButton("Open Hostify", url=start_url),
+            button("Open Hostify", url=start_url, style="success"),
             InlineKeyboardButton("Close", callback_data="hostify:ui:close"),
         ]])
         try:
@@ -127,7 +128,7 @@ async def removeadmin_command(client: Client, message):
         label = _name(admin)[:28]
         row.extend([
             InlineKeyboardButton(label, url=f"tg://user?id={admin_id}"),
-            InlineKeyboardButton("Remove", callback_data=f"hostify:admin:remove:{admin_id}"),
+            button("Remove", callback_data=f"hostify:admin:remove:{admin_id}", style="danger"),
         ])
         rows.append(row)
         row = []
