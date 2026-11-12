@@ -138,12 +138,15 @@ def _detail_keyboard(name: str, owner: bool, status: str, back_category: str = "
             InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}"),
         ])
         action = "stop" if status == "running" else "run"
-        rows.append([
+        actions = [
             button("Stop" if action == "stop" else "Run",
                    callback_data=f"hostify:bot:{action}:{name}:{back_category}:{back_page}",
                    style="success" if action == "run" else "danger"),
-            InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}"),
-        ])
+        ]
+        if status == "running":
+            actions.append(button("Restart", callback_data=f"hostify:bot:restart:{name}:{back_category}:{back_page}", style="success"))
+        rows.append(actions)
+        rows.append([InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}")])
         rows.append([button("Delete", callback_data=f"hostify:bot:delete:{name}:{back_category}:{back_page}", style="danger")])
     else:
         rows.append([InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}")])
@@ -316,7 +319,7 @@ async def bot_callback(client: Client, query):
             lines = read_logs(name, 40)
             output = f"LAST {len(lines or [])} LOG LINES: {name}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
             await query.message.edit_text(_quoted(output[-3400:]), parse_mode=ParseMode.HTML,
-                reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}")]]))
+                reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]))
             await query.answer()
         except Exception:
             logger.exception("Could not read logs for %s", name)
@@ -330,6 +333,9 @@ async def bot_callback(client: Client, query):
     if action == "stop":
         ok, detail = await stop_bot(name)
         result = "Deployment stopped." if ok else f"Could not stop deployment: {detail}"
+    elif action == "restart":
+        ok, detail = await restart_bot(name)
+        result = "Deployment restarted." if ok else f"Could not restart deployment: {detail}"
     elif action == "run":
         ok, detail = await restart_bot(name)
         result = "Deployment started." if ok else f"Could not start deployment: {detail}"
