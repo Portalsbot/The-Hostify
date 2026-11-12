@@ -424,7 +424,19 @@ async def settings_callback(client: Client, query):
             markup=_keyboard([[_button("Refresh GitHub", "hostify:settings:github_refresh")], [_button("Back", "hostify:settings:open")]]),
         )
     elif action == "github_refresh":
-        await _edit(query.message, "Send /github to refresh the GitHub integration screen.")
+        try:
+            from .github import _screen_text
+            github_text, connected = await _screen_text()
+            rows = [[_button("Refresh", "hostify:settings:github_refresh")]]
+            rows.append([_button("Back", "hostify:settings:github")])
+            await _edit(query.message, github_text, markup=_keyboard(rows))
+        except Exception:
+            logger.exception("Could not refresh GitHub status from settings")
+            await _edit(
+                query.message,
+                "Could not refresh GitHub status. Use /github to inspect the connection.",
+                markup=_keyboard([[_button("Back", "hostify:settings:github")]]),
+            )
     elif action == "admins":
         from .admins import cancel_admin_add
         cancel_admin_add(user.id, query.message.chat.id)
