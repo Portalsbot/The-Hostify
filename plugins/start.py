@@ -11,6 +11,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from branding import get_branding
 from database import get_admins
 from smallcaps import sc
+from ui_buttons import button
 import messages as M
 from .guard import is_owner, is_admin
 
@@ -30,7 +31,7 @@ def _btn(text: str, data: str, url: str | None = None):
     return InlineKeyboardButton(text, callback_data=data)
 
 def _close_row():
-    return [_btn("Close", "hostify:ui:close")]
+    return [button("Close", callback_data="hostify:ui:close", style="danger")]
 
 def _start_keyboard():
     return InlineKeyboardMarkup([
@@ -43,7 +44,7 @@ def _start_keyboard():
 
 def _page_keyboard():
     return InlineKeyboardMarkup([
-        [_btn("Back", "hostify:start:back"), _btn("Close", "hostify:ui:close")]
+        [_btn("Back", "hostify:start:back"), button("Close", callback_data="hostify:ui:close", style="danger")]
     ])
 
 def _start_text() -> str:
