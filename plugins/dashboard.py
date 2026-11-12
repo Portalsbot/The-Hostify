@@ -238,13 +238,14 @@ async def bot_callback(client: Client, query):
             lines.extend(f"{key}=••••••••" for key in keys)
         else:
             lines.append("No environment variables are configured.")
+        rows = []
+        if owner:
+            rows.append([InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}")])
+        rows.append([InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")])
         await query.message.edit_text(
             sc("\n".join(lines)),
             parse_mode=ParseMode.DISABLED,
-            reply_markup=_keyboard([
-                [InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}")],
-                [InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")],
-            ]),
+            reply_markup=_keyboard(rows),
         )
         await query.answer()
         return
