@@ -74,7 +74,7 @@ def _show_markup(key: str):
         [button("Edit Text", callback_data=f"hostify:message:edit:{key}", style="success")],
         [button("Reset Default", callback_data=f"hostify:message:reset:{key}", style="danger")],
         [InlineKeyboardButton("Back", callback_data="hostify:message:back:0"),
-         InlineKeyboardButton("Close", callback_data="hostify:ui:close")],
+         button("Close", callback_data="hostify:ui:close", style="danger")],
     ])
 
 
