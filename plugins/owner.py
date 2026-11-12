@@ -176,7 +176,7 @@ async def commands_handler(client: Client, message):
         "/delete NAME — Delete a deployed bot after confirmation\n"
         "/logs NAME — View the last 40 deployment log lines\n"
         "/status — View Hostify CPU, RAM, disk and deployment status\n"
-        "/ping — Check Telegram connectivity\n"
+
         "/setting — Open Hostify settings\n"
         "/settings — Open Hostify settings\n"
         "/setbrand FIELD VALUE — Edit branding\n"
@@ -185,7 +185,7 @@ async def commands_handler(client: Client, message):
         "/resetmsg ID — Restore a default template\n"
         "/addadmin — Add an administrator by Telegram ID\n"
         "/removeadmin — Select and remove an administrator\n"
-        "/admins — View the admin team\n"
+
         "/github — Inspect GitHub App connection and repositories"
     )
     await _reply(message, text)
