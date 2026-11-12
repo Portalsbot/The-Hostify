@@ -36,6 +36,7 @@ OWNER_COMMANDS = PUBLIC_COMMANDS + [
     {"command": "delete", "description": "Delete a deployed bot"},
     {"command": "logs", "description": "View a deployed bot's logs"},
     {"command": "status", "description": "View Hostify system status"},
+    {"command": "setting", "description": "Open Hostify settings"},
     {"command": "settings", "description": "Open Hostify settings"},
     {"command": "setbrand", "description": "Edit Hostify branding"},
     {"command": "messageonly", "description": "Browse editable messages"},
