@@ -140,7 +140,7 @@ async def _settings_screen(message):
             _button("Messages", "hostify:message:list:0"),
         ],
         [
-            _button("Deployments", "hostify:list:root"),
+            _button("Deployments", "hostify:list:root:settings"),
             _button("Admins", "hostify:settings:admins"),
         ],
         [_button("GitHub Integration", "hostify:settings:github")],
@@ -421,7 +421,7 @@ async def settings_callback(client: Client, query):
         await _edit(
             query.message,
             "GitHub App integration\n\nUse /github to inspect the App connection, installation and repositories.\n\nCredentials are stored in Render environment variables, never in Telegram.",
-            markup=_keyboard([[_button("Refresh GitHub", "hostify:settings:github_refresh")]]),
+            markup=_keyboard([[_button("Refresh GitHub", "hostify:settings:github_refresh")], [_button("Back", "hostify:settings:open")]]),
         )
     elif action == "github_refresh":
         await _edit(query.message, "Send /github to refresh the GitHub integration screen.")
