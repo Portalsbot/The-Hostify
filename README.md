@@ -102,7 +102,7 @@ Admins can view and manage only deployments they created: they can edit their en
 - Each deployment's environment variables are encrypted in MongoDB.
 - Each deployment is recorded with the Telegram user ID of the admin who created it.
 - Owners can view and manage every deployment. Admins can view, edit environment variables, run, stop, restart and delete only deployments they created; they cannot access another admin's or the owner's deployments.
-- `ALLOW_UNSANDBOXED_DEPLOYMENTS=false` is the safe default. Enabling it allows trusted admin-submitted Python code to execute under the Hostify service account. This is **not a sandbox**. Only enable it when every admin and repository is trusted.
+- `ALLOW_UNSANDBOXED_DEPLOYMENTS=false` is the safe default. To activate `/deploy`, set this variable to `true` in Render only after restricting admin access to trusted people and approving the repositories they may deploy. Submitted Python code executes under the Hostify service account; this is **not a sandbox**.
 - Docker Engine integration for customer projects, Java runtime deployment, and isolated per-project containers are not implemented in this version. The `/docker` command is intentionally not registered.
 - Controller shutdown/restart commands rely on the hosting provider's process restart behaviour. Use the Render dashboard to suspend or manually restart the service when required.
 
