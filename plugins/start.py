@@ -25,10 +25,17 @@ def _styled_html(value: str) -> str:
     parts = re.split(r"(<[^>]+>)", value)
     return "".join(part if part.startswith("<") and part.endswith(">") else sc(part) for part in parts)
 
-def _btn(text: str, data: str, url: str | None = None):
+def _btn(text: str, data: str, url: str | None = None, style: str | None = None):
     if url:
         return InlineKeyboardButton(text, url=url)
-    return InlineKeyboardButton(text, callback_data=data)
+    kwargs = {"callback_data": data}
+    if style in {"success", "danger", "primary"}:
+        kwargs["style"] = style
+    try:
+        return InlineKeyboardButton(text, **kwargs)
+    except TypeError:
+        kwargs.pop("style", None)
+        return InlineKeyboardButton(text, **kwargs)
 
 def _close_row():
     return [button("Close", callback_data="hostify:ui:close", style="danger")]
