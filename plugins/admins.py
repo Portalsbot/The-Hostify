@@ -73,7 +73,7 @@ async def addadmin_input(client: Client, message):
         start_url = f"https://t.me/{bot_username}?start=admin"
         markup = InlineKeyboardMarkup([[
             button("Open Hostify", url=start_url, style="success"),
-            InlineKeyboardButton("Close", callback_data="hostify:ui:close"),
+            button("Close", callback_data="hostify:ui:close", style="danger"),
         ]])
         try:
             await client.send_message(
@@ -92,7 +92,7 @@ async def addadmin_input(client: Client, message):
             message,
             f"{notification}\nAdmin ID: {admin_id}",
             InlineKeyboardMarkup([
-                [InlineKeyboardButton("Open Hostify", url=start_url)],
+                [button("Open Hostify", url=start_url, style="success")],
                 [InlineKeyboardButton("Close", callback_data="hostify:ui:close")],
             ]),
         )
