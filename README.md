@@ -85,7 +85,7 @@ Admins can view and manage only deployments they created: they can edit their en
 | `/delete NAME` | Delete a deployment after confirmation |
 | `/logs NAME` | Read deployment logs |
 | `/status` | View CPU, RAM, storage and deployment counts |
-| `/settings` | Open Hostify settings |
+| `/setting` or `/settings` | Open Hostify settings |
 | `/setbrand FIELD VALUE` | Edit welcome-page branding, owner/developer/support links, channel links, language, library and database labels |
 | `/messageonly` | Browse editable message templates |
 | `/setmsg KEY TEXT` | Edit a message template |
