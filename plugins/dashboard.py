@@ -14,6 +14,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from database import get_bot, list_bots, update_bot_env
 from manager import delete_bot, read_logs, restart_bot, stop_bot
 from smallcaps import sc
+from ui_buttons import button
 from .guard import is_owner, is_owner_or_admin
 
 logger = logging.getLogger("hostify.plugins.dashboard")
@@ -56,8 +57,8 @@ async def _visible_bots(user_id: int):
 def _root_keyboard():
     return _keyboard([
         [
-            InlineKeyboardButton("Running", callback_data="hostify:list:running:0"),
-            InlineKeyboardButton("Stopped", callback_data="hostify:list:stopped:0"),
+            button("Running", callback_data="hostify:list:running:0", style="success"),
+            button("Stopped", callback_data="hostify:list:stopped:0", style="danger"),
         ],
         [InlineKeyboardButton("All Bots", callback_data="hostify:list:all:0")],
     ])
@@ -134,10 +135,10 @@ def _detail_keyboard(name: str, owner: bool, status: str, back_category: str = "
         action = "stop" if status == "running" else "run"
         rows.append([
             InlineKeyboardButton("Stop" if action == "stop" else "Run",
-                                 callback_data=f"hostify:bot:{action}:{name}:{back_category}:{back_page}"),
+                                 callback_data=f"hostify:bot:{action}:{name}:{back_category}:{back_page}", style="success" if action == "run" else "danger"),
             InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}"),
         ])
-        rows.append([InlineKeyboardButton("Delete", callback_data=f"hostify:bot:delete:{name}:{back_category}:{back_page}")])
+        rows.append([button("Delete", callback_data=f"hostify:bot:delete:{name}:{back_category}:{back_page}", style="danger")])
     else:
         rows.append([InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}")])
         rows.append([InlineKeyboardButton("Logs", callback_data=f"hostify:bot:logs:{name}:{back_category}:{back_page}")])
@@ -240,12 +241,50 @@ async def bot_callback(client: Client, query):
             lines.append("No environment variables are configured.")
         rows = []
         if owner:
-            rows.append([InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}")])
-        rows.append([InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")])
+            rows.append([button("Reveal Values", callback_data=f"hostify:bot:envshow:{name}:{back_category}:{back_page}", style="primary")])
+        rows.append([button("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}", style="success")])
+        rows.append([button("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")])
         await query.message.edit_text(
             sc("\n".join(lines)),
             parse_mode=ParseMode.DISABLED,
             reply_markup=_keyboard(rows),
+        )
+        await query.answer()
+        return
+
+    if action == "envshow":
+        if not owner:
+            await query.answer("Only the owner can reveal deployment environment values.", show_alert=True)
+            return
+        env = bot.get("env_vars") or {}
+        lines = [
+            f"<b>RUNNING ENVIRONMENT / API VALUES: {html.escape(name)}</b>",
+            "<i>These values are visible only to the owner in this private chat.</i>",
+            "",
+        ]
+        used = sum(len(line) for line in lines)
+        for key, value in sorted(env.items()):
+            if key == "NOTIFY_CHANNEL":
+                continue
+            value_text = str(value)
+            if len(value_text) > 500:
+                value_text = value_text[:500] + "… [truncated]"
+            line = f"<code>{html.escape(str(key))}={html.escape(value_text)}</code>"
+            if used + len(line) + 1 > 3400:
+                lines.append("<i>Remaining variables were omitted to fit Telegram's message limit.</i>")
+                break
+            lines.append(line)
+            used += len(line) + 1
+        if len(lines) == 3:
+            lines.append("No environment variables are configured.")
+        await query.message.edit_text(
+            "\n".join(lines),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_keyboard([
+                [button("Hide Values", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}")],
+                [button("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")],
+            ]),
+            disable_web_page_preview=True,
         )
         await query.answer()
         return
@@ -300,8 +339,8 @@ async def bot_callback(client: Client, query):
             sc(f"Confirm permanent deletion of {name}? This cannot be undone."),
             parse_mode=ParseMode.DISABLED,
             reply_markup=_keyboard([[
-                InlineKeyboardButton("Confirm Delete", callback_data=f"hostify:botdelete:confirm:{token}"),
-                InlineKeyboardButton("Cancel", callback_data=f"hostify:botdelete:cancel:{token}"),
+                button("Confirm Delete", callback_data=f"hostify:botdelete:confirm:{token}", style="primary"),
+                button("Cancel", callback_data=f"hostify:botdelete:cancel:{token}", style="danger"),
             ]]),
         )
         await query.answer()
