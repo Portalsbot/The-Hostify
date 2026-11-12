@@ -40,7 +40,10 @@ def _button(label: str, callback: str, *, style: str | None = None):
 
 
 def _close():
-    return InlineKeyboardButton("Close", callback_data="hostify:ui:close")
+    try:
+        return InlineKeyboardButton("Close", callback_data="hostify:ui:close", style="danger")
+    except TypeError:
+        return InlineKeyboardButton("Close", callback_data="hostify:ui:close")
 
 
 def _keyboard(rows=None):
@@ -327,8 +330,8 @@ async def delete_command(client: Client, message):
     token = secrets.token_urlsafe(9)
     _PENDING_DELETE[token] = (message.chat.id, message.from_user.id, name, time.monotonic() + _DELETE_TTL)
     markup = _keyboard([[
-        _button("Confirm Delete", f"hostify:ownerdelete:confirm:{token}", style="danger"),
-        _button("Cancel", f"hostify:ownerdelete:cancel:{token}"),
+        _button("Confirm Delete", f"hostify:ownerdelete:confirm:{token}", style="primary"),
+        _button("Cancel", f"hostify:ownerdelete:cancel:{token}", style="danger"),
     ]])
     await _reply(message, f"Delete {name}? This permanently removes its files and database record.", markup=markup)
 
