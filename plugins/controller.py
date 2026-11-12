@@ -125,7 +125,7 @@ async def restartme_command(client: Client, message):
         return
     try:
         await set_app_setting("controller", "pending_notice", "restart")
-        await _broadcast("Hostify is restarting.")
+        await _broadcast("Hostify is restarting.", include_request=False)
         await message.reply_text(
             f"<blockquote>{html.escape(sc('Hostify restart request accepted.'))}</blockquote>",
             parse_mode=ParseMode.HTML,
