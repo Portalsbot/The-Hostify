@@ -145,7 +145,7 @@ async def _settings_screen(message):
     await _edit(message, "HOSTIFY SETTINGS\n\n" + "\n".join(fields), markup=_keyboard(rows))
 
 
-async def cancel_brand_edit(user_id: int, chat_id: int) -> bool:
+def cancel_brand_edit(user_id: int, chat_id: int) -> bool:
     pending = _PENDING_BRAND.get(user_id)
     if pending is None or pending[0] != chat_id:
         return False
