@@ -321,6 +321,56 @@ async def bot_callback(client: Client, query):
     await query.answer(result[:180], show_alert=not ok)
 
 
+@Client.on_callback_query(filters.regex(r"^hostify:botdelete:"))
+async def bot_delete_confirmation(client: Client, query):
+    user = query.from_user
+    message = query.message
+    if not user or not is_owner(user.id) or message is None:
+        await query.answer("Only the owner can delete deployments.", show_alert=True)
+        return
+    parts = (query.data or "").split(":")
+    if len(parts) != 4:
+        await query.answer("Invalid deletion confirmation.", show_alert=True)
+        return
+    action, token = parts[2], parts[3]
+    pending = _pending_delete.pop(token, None)
+    if pending is None:
+        await query.answer("Confirmation expired. Open /list and try again.", show_alert=True)
+        return
+    chat_id, message_id, owner_id, name, category, page, expiry = pending
+    if (
+        chat_id != message.chat.id
+        or message_id != message.id
+        or owner_id != user.id
+        or time.monotonic() > expiry
+    ):
+        await query.answer("This confirmation expired or belongs to another user.", show_alert=True)
+        return
+    if action == "cancel":
+        bot = await get_bot(name)
+        if bot:
+            await message.edit_text(
+                sc(_detail_text(bot)),
+                parse_mode=ParseMode.DISABLED,
+                reply_markup=_detail_keyboard(name, True, str(bot.get("status", "stopped")), category, page),
+            )
+        else:
+            await message.edit_text(sc("Deletion cancelled."), parse_mode=ParseMode.DISABLED, reply_markup=_keyboard([]))
+        await query.answer("Deletion cancelled.")
+        return
+    if action != "confirm":
+        await query.answer("Unknown deletion action.", show_alert=True)
+        return
+    ok, detail = await delete_bot(name)
+    result = f"Deployment deleted successfully: {name}." if ok else f"Could not delete {name}: {detail or 'operation failed'}."
+    await message.edit_text(
+        sc(result),
+        parse_mode=ParseMode.DISABLED,
+        reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:list:{category}:{page}")]]),
+    )
+    await query.answer("Deployment deleted." if ok else "Deletion failed.", show_alert=not ok)
+
+
 def cancel_environment_edit(user_id: int, chat_id: int) -> bool:
     """Clear the user's pending environment edit flow."""
     pending = _env_sessions.get(user_id)
