@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 from pyrogram import Client, filters
-from ui_buttons import button
 
 logger = logging.getLogger("hostify.plugins.ui")
 
