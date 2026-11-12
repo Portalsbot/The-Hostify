@@ -166,27 +166,25 @@ async def commands_handler(client: Client, message):
         await _reply(message, "This command is not for you senpai.")
         return
     text = (
-        "OWNER COMMANDS\n\n"
-        "/commands — Show owner commands\n"
-        "/deploy — Deploy a repository (owner and admins)\n"
-        "/cancel — Cancel the current setup\n"
-        "/list — View every deployment\n"
-        "/stop NAME — Stop a deployed bot\n"
-        "/restart NAME — Restart a deployed bot\n"
-        "/delete NAME — Delete a deployed bot after confirmation\n"
-        "/logs NAME — View the last 40 deployment log lines\n"
-        "/status — View Hostify CPU, RAM, disk and deployment status\n"
-
-        "/setting — Open Hostify settings\n"
-        "/settings — Open Hostify settings\n"
-        "/setbrand FIELD VALUE — Edit branding\n"
-        "/messageonly — Browse editable message templates\n"
-        "/setmsg ID TEXT — Edit a message template\n"
-        "/resetmsg ID — Restore a default template\n"
-        "/addadmin — Add an administrator by Telegram ID\n"
-        "/removeadmin — Select and remove an administrator\n"
-
-        "/github — Inspect GitHub App connection and repositories"
+        "OWNER COMMANDS\\n\\n"
+        "/commands — Show owner commands\\n"
+        "/deploy — Start repository deployment (owner and admins)\\n"
+        "/cancel — Cancel an active setup\\n"
+        "/list — View every deployment\\n"
+        "/stop NAME — Stop a deployed bot\\n"
+        "/restart NAME — Restart a deployed bot\\n"
+        "/delete NAME — Delete a deployed bot after confirmation\\n"
+        "/logs NAME — Read the last 40 deployment log lines\\n"
+        "/status — View Hostify CPU, RAM, storage and deployment status\\n"
+        "/setting — Open Hostify settings\\n"
+        "/settings — Alias for /setting\\n"
+        "/setbrand FIELD VALUE — Edit Hostify branding\\n"
+        "/messageonly — Browse every editable message template\\n"
+        "/setmsg ID TEXT — Edit a message template\\n"
+        "/resetmsg ID — Restore a default template\\n"
+        "/addadmin — Add an administrator by Telegram ID\\n"
+        "/removeadmin — Select and remove an administrator\\n"
+        "/github — Check GitHub App connection and repository access"
     )
     await _reply(message, text)
 
