@@ -412,7 +412,7 @@ async def bot_delete_confirmation(client: Client, query):
             await message.edit_text(
                 _quoted(_detail_text(bot)),
                 parse_mode=ParseMode.HTML,
-                reply_markup=_detail_keyboard(name, True, str(bot.get("status", "stopped")), category, page),
+                reply_markup=_detail_keyboard(name, _can_view(user.id, bot), str(bot.get("status", "stopped")), category, page),
             )
         else:
             await message.edit_text(_quoted("Deletion cancelled."), parse_mode=ParseMode.HTML, reply_markup=_keyboard([]))
