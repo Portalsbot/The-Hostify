@@ -378,7 +378,7 @@ async def _show_bot_list(message, user_id: int, status: str, page: int, *, edit:
 
 async def _show_bot_detail(message, user_id: int, name: str):
     if not _NAME_PATTERN.fullmatch(name):
-        await _answer(type("Q", (), {"answer": message.reply_text})(), "Invalid deployment name.", alert=True)
+        await _edit(message, "Invalid deployment name.")
         return
     bot = await get_bot(name)
     if not bot:
@@ -1068,7 +1068,7 @@ async def message_template_callback(client: Client, query):
     await query.answer()
 
 
-@Client.on_message(filters.private & owner_only_filter if False else filters.private, group=10)
+@Client.on_message(filters.private, group=10)
 async def unknown_owner_command(client: Client, message):
     """Unknown slash commands get a clear response; ordinary text is ignored."""
     if not message.from_user or not is_owner(message.from_user.id):
