@@ -27,7 +27,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(), _file_handler],
 )
 
-logger = logging.getLogger("hostify")
+from runtime_logs import install_log_capture\n\ninstall_log_capture()\n\nlogger = logging.getLogger("hostify")
 SERVICE_READY = False
 
 
