@@ -130,9 +130,9 @@ def _detail_text(bot: dict) -> str:
     )
 
 
-def _detail_keyboard(name: str, owner: bool, status: str, back_category: str = "all", back_page: int = 0):
+def _detail_keyboard(name: str, can_manage: bool, status: str, back_category: str = "all", back_page: int = 0):
     rows = []
-    if owner:
+    if can_manage:
         rows.append([
             InlineKeyboardButton("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}"),
             InlineKeyboardButton("Environment / API", callback_data=f"hostify:bot:envview:{name}:{back_category}:{back_page}"),
@@ -372,7 +372,7 @@ async def bot_callback(client: Client, query):
         updated = await get_bot(name)
         if updated:
             await query.message.edit_text(_quoted(_detail_text(updated)), parse_mode=ParseMode.HTML,
-                reply_markup=_detail_keyboard(name, owner, str(updated.get("status", "stopped")), back_category, back_page))
+                reply_markup=_detail_keyboard(name, can_manage, str(updated.get("status", "stopped")), back_category, back_page))
         else:
             await query.message.edit_text(_quoted(result), parse_mode=ParseMode.HTML, reply_markup=_keyboard([]))
     await query.answer(result[:180], show_alert=not ok)
