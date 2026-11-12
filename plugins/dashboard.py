@@ -33,11 +33,16 @@ def _keyboard(rows):
     return InlineKeyboardMarkup(rows)
 
 
+async def _quoted(text: str) -> str:
+    return f"<blockquote>{html.escape(sc(text))}</blockquote>"
+
+
 async def _reply(message, text: str, markup=None):
     return await message.reply_text(
-        sc(text),
-        parse_mode=ParseMode.DISABLED,
+        _quoted(text),
+        parse_mode=ParseMode.HTML,
         reply_markup=markup or _keyboard([]),
+        disable_web_page_preview=True,
     )
 
 
@@ -156,8 +161,8 @@ async def _render_list(query, user_id: int, category: str, page: int):
     max_page = max(0, (len(bots) - 1) // 10)
     page = min(page, max_page)
     await query.message.edit_text(
-        sc(_list_text(category, bots, page)),
-        parse_mode=ParseMode.DISABLED,
+        _quoted(_list_text(category, bots, page)),
+        parse_mode=ParseMode.HTML,
         reply_markup=_list_keyboard(category, bots, page),
         disable_web_page_preview=True,
     )
@@ -181,8 +186,8 @@ async def list_callback(client: Client, query):
     parts = (query.data or "").split(":")
     if parts[2] == "root":
         await query.message.edit_text(
-            sc("Here is the list of all bots!"),
-            parse_mode=ParseMode.DISABLED,
+            _quoted("Here is the list of all bots!"),
+            parse_mode=ParseMode.HTML,
             reply_markup=_root_keyboard(),
         )
         await query.answer()
@@ -224,8 +229,8 @@ async def bot_callback(client: Client, query):
 
     if action == "view":
         await query.message.edit_text(
-            sc(_detail_text(bot)),
-            parse_mode=ParseMode.DISABLED,
+            _quoted(_detail_text(bot)),
+            parse_mode=ParseMode.HTML,
             reply_markup=_detail_keyboard(name, owner, str(bot.get("status", "stopped")), back_category, back_page),
             disable_web_page_preview=True,
         )
@@ -246,8 +251,8 @@ async def bot_callback(client: Client, query):
             rows.append([button("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}", style="success")])
         rows.append([button("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")])
         await query.message.edit_text(
-            sc("\n".join(lines)),
-            parse_mode=ParseMode.DISABLED,
+            _quoted("\n".join(lines)),
+            parse_mode=ParseMode.HTML,
             reply_markup=_keyboard(rows),
         )
         await query.answer()
@@ -296,8 +301,8 @@ async def bot_callback(client: Client, query):
             return
         _env_sessions[user.id] = (query.message.chat.id, name)
         await query.message.edit_text(
-            sc(f"Send environment variables for {name} as KEY=VALUE, one per line. Use KEY=DELETE to remove a variable. Secret values are encrypted in MongoDB. Send /cancel to abort."),
-            parse_mode=ParseMode.DISABLED,
+            _quoted(f"Send environment variables for {name} as KEY=VALUE, one per line. Use KEY=DELETE to remove a variable. Secret values are encrypted in MongoDB. Send /cancel to abort."),
+            parse_mode=ParseMode.HTML,
             reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]),
         )
         await query.answer()
@@ -307,7 +312,7 @@ async def bot_callback(client: Client, query):
         try:
             lines = read_logs(name, 40)
             output = f"LAST {len(lines or [])} LOG LINES: {name}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
-            await query.message.edit_text(sc(output[-3800:]), parse_mode=ParseMode.DISABLED,
+            await query.message.edit_text(_quoted(output[-3400:]), parse_mode=ParseMode.HTML,
                 reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}")]]))
             await query.answer()
         except Exception:
@@ -337,8 +342,8 @@ async def bot_callback(client: Client, query):
             time.monotonic() + 60,
         )
         await query.message.edit_text(
-            sc(f"Confirm permanent deletion of {name}? This cannot be undone."),
-            parse_mode=ParseMode.DISABLED,
+            _quoted(f"Confirm permanent deletion of {name}? This cannot be undone."),
+            parse_mode=ParseMode.HTML,
             reply_markup=_keyboard([[
                 button("Confirm Delete", callback_data=f"hostify:botdelete:confirm:{token}", style="primary"),
                 button("Cancel", callback_data=f"hostify:botdelete:cancel:{token}", style="danger"),
@@ -351,14 +356,14 @@ async def bot_callback(client: Client, query):
         return
 
     if action == "delete" and ok:
-        await query.message.edit_text(sc(result), parse_mode=ParseMode.DISABLED, reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:list:{back_category}:{back_page}")]]))
+        await query.message.edit_text(_quoted(result), parse_mode=ParseMode.HTML, reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:list:{back_category}:{back_page}")]]))
     else:
         updated = await get_bot(name)
         if updated:
-            await query.message.edit_text(sc(_detail_text(updated)), parse_mode=ParseMode.DISABLED,
+            await query.message.edit_text(_quoted(_detail_text(updated)), parse_mode=ParseMode.HTML,
                 reply_markup=_detail_keyboard(name, owner, str(updated.get("status", "stopped")), back_category, back_page))
         else:
-            await query.message.edit_text(sc(result), parse_mode=ParseMode.DISABLED, reply_markup=_keyboard([]))
+            await query.message.edit_text(_quoted(result), parse_mode=ParseMode.HTML, reply_markup=_keyboard([]))
     await query.answer(result[:180], show_alert=not ok)
 
 
@@ -391,12 +396,12 @@ async def bot_delete_confirmation(client: Client, query):
         bot = await get_bot(name)
         if bot:
             await message.edit_text(
-                sc(_detail_text(bot)),
-                parse_mode=ParseMode.DISABLED,
+                _quoted(_detail_text(bot)),
+                parse_mode=ParseMode.HTML,
                 reply_markup=_detail_keyboard(name, True, str(bot.get("status", "stopped")), category, page),
             )
         else:
-            await message.edit_text(sc("Deletion cancelled."), parse_mode=ParseMode.DISABLED, reply_markup=_keyboard([]))
+            await message.edit_text(_quoted("Deletion cancelled."), parse_mode=ParseMode.HTML, reply_markup=_keyboard([]))
         await query.answer("Deletion cancelled.")
         return
     if action != "confirm":
@@ -405,8 +410,8 @@ async def bot_delete_confirmation(client: Client, query):
     ok, detail = await delete_bot(name)
     result = f"Deployment deleted successfully: {name}." if ok else f"Could not delete {name}: {detail or 'operation failed'}."
     await message.edit_text(
-        sc(result),
-        parse_mode=ParseMode.DISABLED,
+        _quoted(result),
+        parse_mode=ParseMode.HTML,
         reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:list:{category}:{page}")]]),
     )
     await query.answer("Deployment deleted." if ok else "Deletion failed.", show_alert=not ok)
