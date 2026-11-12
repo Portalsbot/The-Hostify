@@ -488,7 +488,7 @@ async def unknown_owner_command(client: Client, message):
     parts = (message.text or "").split(maxsplit=1)
     command = parts[0].split("@", 1)[0].lstrip("/").casefold() if parts and parts[0].startswith("/") else ""
     known = {
-        "start", "command", "commands", "admins", "deploy", "cancel", "list",
+        "start", "command", "commands", "admins", "deploy", "cancel", "cancle", "list",
         "stop", "restart", "delete", "logs", "status", "ping", "settings",
         "setting", "setbrand", "messageonly", "setmsg", "resetmsg",
         "addadmin", "removeadmin", "github", "mylogs", "restarme", "stopme",
