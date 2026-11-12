@@ -14,6 +14,7 @@ from config import BASE_DIR, OWNER_ID
 from database import get_admins, get_registered_users, get_app_settings, set_app_setting
 from smallcaps import sc
 from .guard import is_admin, is_owner
+from ui_buttons import button
 
 logger = logging.getLogger("hostify.plugins.controller")
 REQUEST_URL = "https://t.me/ReactiveHCl"
@@ -21,8 +22,8 @@ REQUEST_URL = "https://t.me/ReactiveHCl"
 
 def _notice_markup():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Request to start again", url=REQUEST_URL)],
-        [InlineKeyboardButton("Close", callback_data="hostify:ui:close")],
+        [button("Request to start again", url=REQUEST_URL, style="success")],
+        [button("Close", callback_data="hostify:ui:close", style="danger")],
     ])
 
 
