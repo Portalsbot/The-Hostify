@@ -177,6 +177,7 @@ async def commands_handler(client: Client, message):
         "/logs NAME — View the last 40 deployment log lines\n"
         "/status — View Hostify CPU, RAM, disk and deployment status\n"
         "/ping — Check Telegram connectivity\n"
+        "/setting — Open Hostify settings\n"
         "/settings — Open Hostify settings\n"
         "/setbrand FIELD VALUE — Edit branding\n"
         "/messageonly — Browse editable message templates\n"
