@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import time
 from dataclasses import dataclass
@@ -44,12 +45,14 @@ _session_lock = asyncio.Lock()
 
 
 async def _reply(message, text: str, *, plain: bool = False):
+    visible = str(text) if plain else format_output(text)
     return await message.reply_text(
-        text if plain else format_output(text),
-        parse_mode=ParseMode.DISABLED,
+        f"<blockquote>{html.escape(visible)}</blockquote>",
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("Close", callback_data="hostify:ui:close")
         ]]),
+        disable_web_page_preview=True,
     )
 
 def _validate_github_url(value: str) -> str:
