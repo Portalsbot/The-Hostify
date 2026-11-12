@@ -256,7 +256,7 @@ async def bot_callback(client: Client, query):
         else:
             lines.append("No environment variables are configured.")
         rows = []
-        if owner:
+        if can_manage:
             rows.append([button("Reveal Values", callback_data=f"hostify:bot:envshow:{name}:{back_category}:{back_page}", style="primary")])
         if can_manage:
             rows.append([button("Edit Environment", callback_data=f"hostify:bot:env:{name}:{back_category}:{back_page}", style="success")])
@@ -270,8 +270,8 @@ async def bot_callback(client: Client, query):
         return
 
     if action == "envshow":
-        if not owner:
-            await query.answer("Only the owner can reveal deployment environment values.", show_alert=True)
+        if not _can_view(user.id, bot):
+            await query.answer("You can only reveal secrets for your own deployments.", show_alert=True)
             return
         env = bot.get("env_vars") or {}
         lines = [
