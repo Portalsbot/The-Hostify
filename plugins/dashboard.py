@@ -59,14 +59,17 @@ async def _visible_bots(user_id: int):
     return [bot for bot in all_bots if bot.get("deployed_by") == user_id]
 
 
-def _root_keyboard():
-    return _keyboard([
+def _root_keyboard(*, back_to_settings: bool = False):
+    rows = [
         [
             button("Running", callback_data="hostify:list:running:0", style="success"),
             button("Stopped", callback_data="hostify:list:stopped:0", style="danger"),
         ],
         [InlineKeyboardButton("All Bots", callback_data="hostify:list:all:0")],
-    ])
+    ]
+    if back_to_settings:
+        rows.append([InlineKeyboardButton("Back", callback_data="hostify:settings:open")])
+    return _keyboard(rows)
 
 
 def _list_text(category: str, bots: list[dict], page: int) -> str:
@@ -191,7 +194,7 @@ async def list_callback(client: Client, query):
         await query.message.edit_text(
             _quoted("Here is the list of all bots!"),
             parse_mode=ParseMode.HTML,
-            reply_markup=_root_keyboard(),
+            reply_markup=_root_keyboard(back_to_settings=len(parts) > 3 and parts[3] == "settings"),
         )
         await query.answer()
         return
