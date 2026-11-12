@@ -57,7 +57,7 @@ Use `/github` in the owner account to check the connection and list accessible r
 | Command | Purpose |
 |---|---|
 | `/start` | Open the welcome menu |
-| `/command` | View public and admin commands |
+| `/command` | View the commands available to your role |
 | `/admins` | View the current admin team |
 | `/ping` | Check Telegram connectivity |
 
@@ -69,10 +69,10 @@ Use `/github` in the owner account to check the connection and list accessible r
 | `/cancel` | Cancel an active deployment setup |
 | `/list` | View the admin's own deployments |
 | `/mylogs` | View the last 40 Hostify controller log lines |
-| `/restartme` | Request a controller restart |
+| `/restarme` | Request a controller restart |
 | `/stopme` | Request a controller shutdown |
 
-Admins cannot stop, restart or delete deployments created by other users.
+Admins cannot stop, restart, delete or edit deployment environment variables. The owner can view and manage every deployment.
 
 ### Owner-only commands
 
@@ -86,7 +86,7 @@ Admins cannot stop, restart or delete deployments created by other users.
 | `/logs NAME` | Read deployment logs |
 | `/status` | View CPU, RAM, storage and deployment counts |
 | `/settings` | Open Hostify settings |
-| `/setbrand FIELD VALUE` | Edit welcome-page branding |
+| `/setbrand FIELD VALUE` | Edit welcome-page branding, owner/developer/support links, channel links, language, library and database labels |
 | `/messageonly` | Browse editable message templates |
 | `/setmsg KEY TEXT` | Edit a message template |
 | `/resetmsg KEY` | Restore a default template |
