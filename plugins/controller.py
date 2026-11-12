@@ -42,8 +42,8 @@ async def _recipients() -> list[int]:
     return sorted(ids)
 
 
-async def _broadcast(client: Client, text: str) -> None:
-    markup = _notice_markup()
+async def _broadcast(client: Client, text: str, *, include_request: bool = True) -> None:
+    markup = _notice_markup() if include_request else InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]])
     recipients = await _recipients()
     for user_id in recipients:
         try:
@@ -64,7 +64,7 @@ async def notify_startup(client: Client) -> None:
         state = await get_app_settings("controller")
         pending = state.get("pending_notice", "")
         if pending in {"restart", "stop"}:
-            await _broadcast("Hostify is back online.")
+            await _broadcast("Hostify is back online.", include_request=False)
             await set_app_setting("controller", "pending_notice", "")
     except Exception:
         logger.exception("Could not send Hostify recovery notice")
@@ -117,15 +117,15 @@ async def mylogs_command(client: Client, message):
         )
 
 
-@Client.on_message(filters.command("restartme") & filters.private)
+@Client.on_message(filters.command("restarme") & filters.private)
 async def restartme_command(client: Client, message):
     if not await _authorised_admin(message):
         return
     try:
         await set_app_setting("controller", "pending_notice", "restart")
-        await _broadcast("Hostify is restarting. The service should return automatically.")
+        await _broadcast("Hostify is restarting.")
         await message.reply_text(
-            sc("Restart request accepted. Hostify is restarting."),
+            sc("Hostify restart request accepted."),
             parse_mode=ParseMode.DISABLED,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]),
         )
