@@ -95,7 +95,7 @@ async def addadmin_input(client: Client, message):
             f"{notification}\nAdmin ID: {admin_id}",
             InlineKeyboardMarkup([
                 [button("Open Hostify", url=start_url, style="success")],
-                [InlineKeyboardButton("Close", callback_data="hostify:ui:close")],
+                [button("Close", callback_data="hostify:ui:close", style="danger")],
             ]),
         )
     except Exception:
