@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import os
 import signal
@@ -44,13 +45,13 @@ async def _recipients() -> list[int]:
 
 
 async def _broadcast(client: Client, text: str, *, include_request: bool = True) -> None:
-    markup = _notice_markup() if include_request else InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]])
+    markup = _notice_markup() if include_request else InlineKeyboardMarkup([[button("Close", callback_data="hostify:ui:close", style="danger")]])
     recipients = await _recipients()
     for user_id in recipients:
         try:
             await client.send_message(
                 user_id,
-                f"<blockquote>{sc(text)}</blockquote>",
+                f"<blockquote>{html.escape(sc(text))}</blockquote>",
                 parse_mode=ParseMode.HTML,
                 reply_markup=markup,
                 disable_web_page_preview=True,
@@ -90,30 +91,30 @@ async def mylogs_command(client: Client, message):
     path = Path(BASE_DIR) / "hostify.log"
     if not path.is_file():
         await message.reply_text(
-            sc("Hostify log file is not available yet."),
+            f"<blockquote>{html.escape(sc('Hostify log file is not available yet.'))}</blockquote>",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]),
-            parse_mode=ParseMode.DISABLED,
+            parse_mode=ParseMode.HTML,
         )
         return
     try:
         data = path.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
         safe = []
         for line in data:
-            for marker in ("BOT_TOKEN=", "API_HASH=", "MONGO_URI=", "GITHUB_APP_PRIVATE_KEY_B64="):
+            for marker in ("BOT_TOKEN=", "API_HASH=", "MONGO_URI=", "DATA_ENCRYPTION_KEY=", "GITHUB_APP_PRIVATE_KEY_B64=", "GITHUB_APP_PRIVATE_KEY="):
                 if marker in line:
                     line = line.split(marker, 1)[0] + marker + "[REDACTED]"
             safe.append(line)
         text = "LAST HOSTIFY LOG LINES\n\n" + ("\n".join(safe) if safe else "No log entries.")
         await message.reply_text(
-            sc(text[-3800:]),
-            parse_mode=ParseMode.DISABLED,
+            f"<blockquote><pre>{html.escape(text[-3400:])}</pre></blockquote>",
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]),
         )
     except Exception:
         logger.exception("Could not read Hostify controller logs")
         await message.reply_text(
-            sc("Could not read Hostify logs."),
-            parse_mode=ParseMode.DISABLED,
+            f"<blockquote>{html.escape(sc('Could not read Hostify logs.'))}</blockquote>",
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]),
         )
 
@@ -126,16 +127,16 @@ async def restartme_command(client: Client, message):
         await set_app_setting("controller", "pending_notice", "restart")
         await _broadcast("Hostify is restarting.")
         await message.reply_text(
-            sc("Hostify restart request accepted."),
-            parse_mode=ParseMode.DISABLED,
+            f"<blockquote>{html.escape(sc('Hostify restart request accepted.'))}</blockquote>",
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]),
         )
         _schedule_termination()
     except Exception:
         logger.exception("Controller restart request failed")
         await message.reply_text(
-            sc("Could not request a controller restart."),
-            parse_mode=ParseMode.DISABLED,
+            f"<blockquote>{html.escape(sc('Could not request a controller restart.'))}</blockquote>",
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]),
         )
 
@@ -148,15 +149,15 @@ async def stopme_command(client: Client, message):
         await set_app_setting("controller", "pending_notice", "stop")
         await _broadcast("Hostify is going offline. Use the request button to contact the owner.")
         await message.reply_text(
-            sc("Hostify shutdown request accepted."),
-            parse_mode=ParseMode.DISABLED,
+            f"<blockquote>{html.escape(sc('Hostify shutdown request accepted.'))}</blockquote>",
+            parse_mode=ParseMode.HTML,
             reply_markup=_notice_markup(),
         )
         _schedule_termination()
     except Exception:
         logger.exception("Controller shutdown request failed")
         await message.reply_text(
-            sc("Could not request a controller shutdown."),
-            parse_mode=ParseMode.DISABLED,
+            f"<blockquote>{html.escape(sc('Could not request a controller shutdown.'))}</blockquote>",
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="hostify:ui:close")]]),
         )
