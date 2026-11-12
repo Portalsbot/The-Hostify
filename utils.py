@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pyrogram import Client
 from pyrogram.enums import ParseMode
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardMarkup
+from ui_buttons import button
 
 import messages as M
 from branding import format_branding
@@ -17,7 +18,7 @@ def _with_close(reply_markup=None):
         getattr(button, "callback_data", None) == "hostify:ui:close"
         for row in rows for button in row
     ):
-        rows.append([InlineKeyboardButton("Close", callback_data="hostify:ui:close")])
+        rows.append([button("Close", callback_data="hostify:ui:close", style="danger")])
     return InlineKeyboardMarkup(rows)
 
 
