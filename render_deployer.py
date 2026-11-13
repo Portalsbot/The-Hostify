@@ -44,8 +44,8 @@ def _service_name(name: str) -> str:
     return value[:50].rstrip("-")
 
 
-async def _json_request(session, method: str, url: str, *, headers=None, payload=None):
-    async with session.request(method, url, headers=headers, json=payload) as response:
+async def _json_request(session, method: str, url: str, *, headers=None, payload=None, params=None):
+    async with session.request(method, url, headers=headers, json=payload, params=params) as response:
         raw = await response.text()
         try:
             data = await response.json(content_type=None) if raw else {}
@@ -119,6 +119,33 @@ async def _create_render_service(name: str, repo_url: str, runtime_type: str, en
         return await _json_request(session, "POST", f"{_API}/services", headers=api_headers, payload=payload)
 
 
+
+
+async def _failure_log_excerpt(session, service_id: str, headers: dict, env_vars: dict[str, str]) -> str:
+    params = {
+        "ownerId": RENDER_WORKSPACE_ID,
+        "resource": service_id,
+        "direction": "backward",
+        "limit": "35",
+        "type": "build",
+    }
+    try:
+        payload = await _json_request(session, "GET", f"{_API}/logs", headers=headers, params=params)
+        logs = payload.get("logs", []) if isinstance(payload, dict) else []
+        lines = []
+        for item in reversed(logs if isinstance(logs, list) else []):
+            line = str(item.get("message") or "").strip() if isinstance(item, dict) else str(item).strip()
+            if not line:
+                continue
+            for secret in env_vars.values():
+                if isinstance(secret, str) and len(secret) >= 6:
+                    line = line.replace(secret, "[REDACTED]")
+            lines.append(line)
+        return "\\n".join(lines)[-1400:]
+    except Exception as exc:
+        logger.info("Could not retrieve Render build-log excerpt for %s: %s", service_id, exc)
+        return ""
+
 async def deploy_to_render(
     name: str,
     repo_url: str,
@@ -173,7 +200,12 @@ async def deploy_to_render(
                     return True, f"{service_id}|{dashboard_url}"
                 if last_status in _TERMINAL_FAILURES:
                     await update_render_deployment(name, status="failed", deploy_status=last_status)
-                    return False, f"Render deployment status: {last_status}. Open the Render dashboard to inspect the build and runtime logs: https://dashboard.render.com/web/{service_id}"
+                    excerpt = await _failure_log_excerpt(session, service_id, headers, env_vars)
+                    reason = f"Render deployment status: {last_status}."
+                    if excerpt:
+                        reason += "\\n\\nRecent build output:\\n" + excerpt
+                    reason += f"\\n\\nFull logs: https://dashboard.render.com/web/{service_id}"
+                    return False, reason
         await update_render_deployment(name, status="deploying", deploy_status=last_status)
         return False, f"Render deployment did not finish within {_DEPLOY_TIMEOUT // 60} minutes. Check its progress and logs: https://dashboard.render.com/web/{service_id}"
 
