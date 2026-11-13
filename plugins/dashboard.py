@@ -320,9 +320,23 @@ async def bot_callback(client: Client, query):
         return
 
     if action == "logs":
+        if bot.get("deployment_provider") == "render":
+            service_id = str(bot.get("render_service_id") or "")
+            dashboard = str(bot.get("service_url") or ("https://dashboard.render.com/web/" + service_id))
+            await query.message.edit_text(
+                _quoted("Render deployment logs for " + name + " are available in the Render dashboard."),
+                parse_mode=ParseMode.HTML,
+                reply_markup=_keyboard([
+                    [button("Open Render Dashboard", url=dashboard, style="success")],
+                    [button("Back", callback_data="hostify:bot:view:" + name + ":" + back_category + ":" + str(back_page))],
+                ]),
+                disable_web_page_preview=True,
+            )
+            await query.answer()
+            return
         try:
             lines = read_logs(name, 40)
-            output = f"LAST {len(lines or [])} LOG LINES: {name}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
+            output = f"LAST {len(lines or [])} LOG LINES: {name}\\n\\n" + ("\\n".join(lines) if lines else "No log output is available.")
             await query.message.edit_text(_quoted(output[-3400:]), parse_mode=ParseMode.HTML,
                 reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]))
             await query.answer()
