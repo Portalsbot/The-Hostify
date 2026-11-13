@@ -12,6 +12,8 @@ import psutil
 from config import OWNER_ID
 from database import list_bots, update_status
 from deployer import launch_existing
+from render_deployer import deploy_to_render, is_render_configured
+from github_app import GitHubAppError, get_installation_token_for_repository
 from utils import send_message
 import messages as M
 
@@ -76,6 +78,29 @@ async def watchdog_loop(client) -> None:
                     continue
 
                 ok, detail = await launch_existing(name, bot.get("env_vars") or {})
+                if not ok and detail == "Bot folder missing." and is_render_configured():
+                    # A Render redeploy erased the legacy local folder. Recreate
+                    # this project as an independent Render service from its GitHub source.
+                    repo_url = bot.get("repo_url")
+                    try:
+                        if not isinstance(repo_url, str) or not repo_url:
+                            raise RuntimeError("Legacy deployment has no GitHub repository URL.")
+                        github_token = await get_installation_token_for_repository(repo_url)
+                        ok, detail = await deploy_to_render(
+                            name,
+                            repo_url,
+                            "python",
+                            bot.get("env_vars") or {},
+                            github_token=github_token,
+                            deployed_by=int(bot.get("deployed_by") or OWNER_ID),
+                        )
+                    except (GitHubAppError, RuntimeError) as exc:
+                        detail = str(exc)
+                        ok = False
+                    if ok:
+                        restarted.append(name)
+                        logger.info("Migrated legacy deployment %s to Render after local folder loss", name)
+                        continue
                 if ok:
                     restarted.append(name)
                 else:
