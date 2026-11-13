@@ -21,7 +21,11 @@ GITHUB_APP_ID = os.getenv("GITHUB_APP_ID", "").strip()
 GITHUB_APP_SLUG = os.getenv("GITHUB_APP_SLUG", "the-hostify").strip()
 GITHUB_APP_PRIVATE_KEY_B64 = os.getenv("GITHUB_APP_PRIVATE_KEY_B64", "").strip()
 GITHUB_APP_PRIVATE_KEY = os.getenv("GITHUB_APP_PRIVATE_KEY", "").strip()
-RENDER_API_KEY = os.getenv("RENDER_API_KEY", "").strip()\nRENDER_WORKSPACE_ID = os.getenv("RENDER_WORKSPACE_ID", "").strip()\nRENDER_REGION = os.getenv("RENDER_REGION", "singapore").strip().lower()\n\nALLOW_UNSANDBOXED_DEPLOYMENTS = (
+RENDER_API_KEY = os.getenv("RENDER_API_KEY", "").strip()
+RENDER_WORKSPACE_ID = os.getenv("RENDER_WORKSPACE_ID", "").strip()
+RENDER_REGION = os.getenv("RENDER_REGION", "singapore").strip().lower()
+
+ALLOW_UNSANDBOXED_DEPLOYMENTS = (
     os.getenv("ALLOW_UNSANDBOXED_DEPLOYMENTS", "false").strip().lower()
     in {"1", "true", "yes", "on"}
 )
