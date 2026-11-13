@@ -97,6 +97,50 @@ async def add_bot(
     )
 
 
+async def add_render_bot(
+    *, name: str, repo_url: str, env_vars: dict[str, str], deployed_by: int,
+    runtime_type: str, service_id: str, deploy_id: str,
+    service_url: str | None = None, status: str = "deploying",
+) -> None:
+    """Persist a Render-managed deployment; no local project folder is required."""
+    now = datetime.now(timezone.utc)
+    await _bots.update_one(
+        {"name": name},
+        {
+            "$set": {
+                "name": name,
+                "repo_url": repo_url,
+                "env_vars": encrypt_env_vars(env_vars),
+                "deployed_by": int(deployed_by),
+                "deployment_provider": "render",
+                "runtime_type": runtime_type,
+                "render_service_id": service_id,
+                "render_deploy_id": deploy_id,
+                "service_url": service_url,
+                "deploy_status": "created",
+                "status": status,
+                "pid": None,
+                "pid_created_at": None,
+                "bot_username": None,
+                "updated_at": now,
+            },
+            "$setOnInsert": {"created_at": now},
+        },
+        upsert=True,
+    )
+
+
+async def update_render_deployment(name: str, *, status: str, deploy_status: str) -> None:
+    await _bots.update_one(
+        {"name": name, "deployment_provider": "render"},
+        {"$set": {
+            "status": status,
+            "deploy_status": deploy_status,
+            "updated_at": datetime.now(timezone.utc),
+        }},
+    )
+
+
 async def get_bot(name: str) -> dict[str, Any] | None:
     return _decode_bot(await _bots.find_one({"name": name}))
 
