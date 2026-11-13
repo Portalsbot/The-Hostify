@@ -41,7 +41,7 @@ def _service_name(name: str) -> str:
     value = re.sub(r"-+", "-", value)
     if not value:
         raise RenderDeploymentError("The deployment name cannot be converted to a valid Render service name.")
-    return value[: fifty := 50].rstrip("-")
+    return value[:50].rstrip("-")
 
 
 async def _json_request(session, method: str, url: str, *, headers=None, payload=None):
@@ -83,7 +83,7 @@ async def _inspect_repository(repo_url: str, github_token: str, runtime_type: st
     return branch, files
 
 
-async def _create_render_service(name: str, repo_url: str, runtime_type: str, env_vars: dict[str, str], branch: str):
+async def _create_render_service(name: str, repo_url: str, runtime_type: str, env_vars: dict[str, str], branch: str, files: set[str]):
     api_headers = {
         "Authorization": f"Bearer {RENDER_API_KEY}",
         "Accept": "application/json",
@@ -96,9 +96,9 @@ async def _create_render_service(name: str, repo_url: str, runtime_type: str, en
         "region": RENDER_REGION,
     }
     if runtime_type == "python":
-        entry = next(item for item in ("main.py", "bot.py", "app.py") if item in _current_files)
+        entry = next(item for item in ("main.py", "bot.py", "app.py") if item in files)
         details["envSpecificDetails"] = {
-            "buildCommand": "pip install -r requirements.txt" if "requirements.txt" in _current_files else "pip install --disable-pip-version-check -U pip",
+            "buildCommand": "pip install -r requirements.txt" if "requirements.txt" in files else "pip install --disable-pip-version-check -U pip",
             "startCommand": f"python {entry}",
         }
     else:
