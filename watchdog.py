@@ -61,6 +61,10 @@ async def watchdog_loop(client) -> None:
             failed: list[str] = []
 
             for bot in bots:
+                # Render-managed services run independently of this controller.
+                # Never restart them from a local folder on the ephemeral filesystem.
+                if bot.get("deployment_provider") == "render":
+                    continue
                 if bot.get("status") != "running":
                     continue
                 if _alive(bot):
