@@ -13,6 +13,7 @@ from config import BASE_DIR
 from database import delete_bot as db_delete
 from database import get_bot, update_status
 from deployer import launch_existing
+from render_deployer import render_service_action
 
 _PROCESS_TIME_TOLERANCE = 1.5
 _STOP_TIMEOUT_SECONDS = 8
@@ -129,6 +130,8 @@ async def stop_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
+    if bot.get("deployment_provider") == "render":
+        return await render_service_action(name, "stop")
 
     ok, detail = await _terminate_bot_process(bot, name)
     if not ok:
@@ -142,6 +145,8 @@ async def restart_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
+    if bot.get("deployment_provider") == "render":
+        return await render_service_action(name, "restart")
 
     ok, detail = await _terminate_bot_process(bot, name)
     if not ok:
@@ -156,6 +161,8 @@ async def delete_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
+    if bot.get("deployment_provider") == "render":
+        return await render_service_action(name, "delete")
 
     ok, detail = await _terminate_bot_process(bot, name)
     if not ok:
