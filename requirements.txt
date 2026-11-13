@@ -1,5 +1,5 @@
 pyrofork>=2.3.69,<3
-pymongo[srv]>=4.9,<5
+pymongo>=4.9,<5
 python-dotenv>=1.0,<2
 psutil>=6,<8
 aiohttp>=3.10,<4
