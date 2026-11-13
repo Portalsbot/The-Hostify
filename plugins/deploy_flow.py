@@ -237,7 +237,7 @@ async def deploy_input_handler(client: Client, message):
             session.name = name
             session.stage = "environment"
             session.created_at = time.monotonic()
-            await _reply(message, M.M11_ASK_ENV, plain=True)
+            await _reply(message, M.M11_ASK_ENV + "\\n\\nRender Free web services must listen on the PORT environment variable. Polling-only bots without an HTTP listener may fail; always-on background workers require a paid Render plan.", plain=True)
             return
 
         if session.stage != "environment":
