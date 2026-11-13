@@ -22,7 +22,10 @@ Set the variables from `.env.example` in Render's Environment page. Use persiste
 - `DATA_ENCRYPTION_KEY` — Fernet key used to encrypt stored deployment environment variables.
 - `BASE_DIR` — writable directory for deployed project files.
 - `SESSION_DIR` — writable directory for the Telegram session.
-- `PORT` — Render web service port.\n- `RENDER_API_KEY` — Render account API key.\n- `RENDER_WORKSPACE_ID` — target Render workspace ID.\n- `RENDER_REGION` — service region; defaults to `singapore`.
+- `PORT` — Render web service port.
+- `RENDER_API_KEY` — Render account API key.
+- `RENDER_WORKSPACE_ID` — target Render workspace ID.
+- `RENDER_REGION` — service region; defaults to `singapore`.
 
 Generate the encryption key:
 
@@ -102,7 +105,8 @@ Admins can view and manage only deployments they created: they can edit their en
 - Each deployment's environment variables are encrypted in MongoDB.
 - Each deployment is recorded with the Telegram user ID of the admin who created it.
 - Owners can view and manage every deployment. Admins can view, edit environment variables, run, stop, restart and delete only deployments they created; they cannot access another admin's or the owner's deployments.
-- New Render API deployments do not execute customer code inside the Hostify controller and do not require `ALLOW_UNSANDBOXED_DEPLOYMENTS=true`. That flag remains relevant only to the legacy local-process deployment path.\n- New services are created as Render Free web services. They must listen on the `PORT` environment variable to pass Render's web-service health checks. Polling-only bots without an HTTP listener may fail; Render background workers require a paid plan. Free services can sleep and do not guarantee uninterrupted 24/7 execution.
+- New Render API deployments do not execute customer code inside the Hostify controller and do not require `ALLOW_UNSANDBOXED_DEPLOYMENTS=true`. That flag remains relevant only to the legacy local-process deployment path.
+- New services are created as Render Free web services. They must listen on the `PORT` environment variable to pass Render's web-service health checks. Polling-only bots without an HTTP listener may fail; Render background workers require a paid plan. Free services can sleep and do not guarantee uninterrupted 24/7 execution.
 - Java is deployed through a repository Dockerfile because Render does not provide a native Java runtime. Docker Engine access inside Hostify is not implemented; Render builds customer Dockerfiles remotely. The `/docker` command remains intentionally unregistered.
 - Controller shutdown/restart commands rely on the hosting provider's process restart behaviour. Use the Render dashboard to suspend or manually restart the service when required.
 
