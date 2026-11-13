@@ -220,3 +220,18 @@ async def render_service_action(name: str, action: str) -> tuple[bool, str | Non
     except (RenderDeploymentError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
         logger.warning("Render action %s failed for %s: %s", action, name, exc)
         return False, str(exc)[:1000]
+
+
+async def update_render_environment(name: str, env_vars: dict[str, str]) -> None:
+    from database import get_bot
+    bot = await get_bot(name)
+    if not bot or bot.get("deployment_provider") != "render":
+        raise RenderDeploymentError("Render deployment record was not found.")
+    service_id = bot.get("render_service_id")
+    if not service_id:
+        raise RenderDeploymentError("Render service ID is missing from MongoDB.")
+    headers = {"Authorization": f"Bearer {RENDER_API_KEY}", "Accept": "application/json", "Content-Type": "application/json"}
+    payload = [{"key": key, "value": value} for key, value in env_vars.items()]
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        await _json_request(session, "PUT", f"{_API}/services/{service_id}/env-vars", headers=headers, payload=payload)
