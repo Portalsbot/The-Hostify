@@ -110,7 +110,6 @@ async def _create_render_service(name: str, repo_url: str, runtime_type: str, en
         "ownerId": RENDER_WORKSPACE_ID,
         "repo": repo_url.removesuffix(".git"),
         "branch": branch,
-        "autoDeploy": "yes",
         "autoDeployTrigger": "commit",
         "envVars": env,
         "serviceDetails": details,
@@ -140,11 +139,11 @@ async def deploy_to_render(
         service = created.get("service") or {}
         deploy = created.get("deploy") or {}
         service_id = service.get("id")
-        deploy_id = deploy.get("id")
+        deploy_id = created.get("deployId") or deploy.get("id")
         if not service_id or not deploy_id:
             raise RenderDeploymentError("Render accepted the request but did not return a service and deployment ID.")
 
-        service_url = service.get("serviceDetails", {}).get("url") or service.get("url")
+        service_url = service.get("dashboardUrl") or service.get("serviceDetails", {}).get("url") or service.get("url")
         await add_render_bot(
             name=name,
             repo_url=repo_url,
@@ -185,3 +184,39 @@ async def deploy_to_render(
         logger.exception("Unexpected Render deployment failure for %s", name)
         return False, "Unexpected Render deployment error. Check Hostify logs and the Render service dashboard."
 
+
+
+async def render_service_action(name: str, action: str) -> tuple[bool, str | None]:
+    """Manage a Render-backed deployment without touching local bot folders."""
+    from database import get_bot
+
+    bot = await get_bot(name)
+    if not bot or bot.get("deployment_provider") != "render":
+        return False, "not_found"
+    service_id = bot.get("render_service_id")
+    if not service_id:
+        return False, "Render service ID is missing from the database."
+    endpoints = {
+        "stop": ("POST", "suspend", "stopped"),
+        "run": ("POST", "resume", "running"),
+        "restart": ("POST", "restart", "running"),
+        "delete": ("DELETE", "", None),
+    }
+    if action not in endpoints:
+        return False, "Unsupported Render service action."
+    method, suffix, new_status = endpoints[action]
+    headers = {"Authorization": f"Bearer {RENDER_API_KEY}", "Accept": "application/json"}
+    url = f"{_API}/services/{service_id}" + (f"/{suffix}" if suffix else "")
+    try:
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            await _json_request(session, method, url, headers=headers)
+        if action == "delete":
+            from database import delete_bot
+            await delete_bot(name)
+        elif new_status:
+            await update_render_deployment(name, status=new_status, deploy_status=bot.get("deploy_status", "live"))
+        return True, None
+    except (RenderDeploymentError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
+        logger.warning("Render action %s failed for %s: %s", action, name, exc)
+        return False, str(exc)[:1000]
