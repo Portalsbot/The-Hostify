@@ -336,7 +336,7 @@ async def bot_callback(client: Client, query):
             return
         try:
             lines = read_logs(name, 40)
-            output = f"LAST {len(lines or [])} LOG LINES: {name}\\n\\n" + ("\\n".join(lines) if lines else "No log output is available.")
+            output = f"LAST {len(lines or [])} LOG LINES: {name}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
             await query.message.edit_text(_quoted(output[-3400:]), parse_mode=ParseMode.HTML,
                 reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]))
             await query.answer()
