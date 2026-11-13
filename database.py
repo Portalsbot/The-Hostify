@@ -156,7 +156,11 @@ async def list_bots(limit: int = 1_000, deployed_by: int | None = None) -> list[
 
 
 async def update_bot_env(name: str, env_vars: dict[str, str]) -> None:
-    """Persist encrypted deployment environment values."""
+    """Apply Render environment changes first, then persist encrypted values."""
+    current = await get_bot(name)
+    if current and current.get("deployment_provider") == "render":
+        from render_deployer import update_render_environment
+        await update_render_environment(name, env_vars)
     await _bots.update_one(
         {"name": name},
         {"$set": {
