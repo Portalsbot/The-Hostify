@@ -8,15 +8,14 @@ from dataclasses import dataclass
 
 from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
-from config import ALLOW_UNSANDBOXED_DEPLOYMENTS
-from utils import format_output
+from pyrogram.types import InlineKeyboardMarkup
 
 import messages as M
 from database import get_bot
-from deployer import deploy_bot, _validate_env_vars, _validate_name, _validate_repo_url
+from deployer import _validate_env_vars, _validate_name, _validate_repo_url
 from github_app import GitHubAppError, get_installation_token_for_repository
+from render_deployer import deploy_to_render, is_render_configured
+from utils import format_output
 from .guard import is_owner_or_admin
 from .admins import cancel_admin_add
 from .dashboard import cancel_environment_edit
@@ -36,12 +35,11 @@ class DeploySession:
     chat_id: int
     stage: str
     created_at: float
+    runtime_type: str | None = None
     repo_url: str | None = None
     name: str | None = None
 
 
-# This bot is configured for a single owner. The state is therefore keyed by
-# the owner ID and additionally bound to the private chat that began the flow.
 _sessions: dict[int, DeploySession] = {}
 _session_lock = asyncio.Lock()
 
@@ -57,13 +55,21 @@ async def _reply(message, text: str, *, plain: bool = False):
         disable_web_page_preview=True,
     )
 
+
+def _type_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [button("Python", callback_data="hostify:deploy:type:python", style="success")],
+        [button("Java", callback_data="hostify:deploy:type:java")],
+        [button("Docker", callback_data="hostify:deploy:type:docker")],
+        [button("Close", callback_data="hostify:ui:close", style="danger")],
+    ])
+
+
 def _validate_github_url(value: str) -> str:
-    """Use the exact GitHub URL validator used by the deployment backend."""
     return _validate_repo_url(value)
 
 
 def _parse_environment(text: str) -> dict[str, str]:
-    """Parse KEY=VALUE lines, then apply the backend's single validation policy."""
     if text.strip().casefold() == "skip":
         return {}
     values: dict[str, str] = {}
@@ -85,17 +91,14 @@ def _get_valid_session(user_id: int, chat_id: int) -> DeploySession | None:
     session = _sessions.get(user_id)
     if session is None:
         return None
-
     if (
         session.stage != "deploying"
         and time.monotonic() - session.created_at > _SESSION_TTL_SECONDS
     ):
         _sessions.pop(user_id, None)
         return None
-
     if session.chat_id != chat_id:
         return None
-
     return session
 
 
@@ -107,8 +110,11 @@ async def deploy_command(client: Client, message):
     if not await is_owner_or_admin(user.id):
         await _reply(message, "Deployment access is restricted to the owner and approved admins.")
         return
-    if not ALLOW_UNSANDBOXED_DEPLOYMENTS:
-        await _reply(message, f"{M.M74_NO_DEPLOY_ACCESS}\n\n{M.M75_DEPLOY_TRUST_WARNING}")
+    if not is_render_configured():
+        await _reply(
+            message,
+            "Render deployment is not configured yet. Add RENDER_API_KEY and RENDER_WORKSPACE_ID to Hostify's Render environment, then redeploy Hostify.",
+        )
         return
 
     async with _session_lock:
@@ -117,19 +123,50 @@ async def deploy_command(client: Client, message):
             existing.stage == "deploying"
             or time.monotonic() - existing.created_at <= _SESSION_TTL_SECONDS
         ):
-            if existing.stage == "deploying":
-                await _reply(message, M.M98_DEPLOY_ALREADY_RUNNING)
-            else:
-                await _reply(message, M.M99_DEPLOY_SESSION_ACTIVE)
+            await _reply(
+                message,
+                M.M98_DEPLOY_ALREADY_RUNNING if existing.stage == "deploying" else M.M99_DEPLOY_SESSION_ACTIVE,
+            )
             return
-
         _sessions[user.id] = DeploySession(
             chat_id=message.chat.id,
-            stage="repository",
+            stage="type",
             created_at=time.monotonic(),
         )
 
-    await _reply(message, M.M07_ASK_REPO, plain=True)
+    await message.reply_text(
+        "<blockquote>Select what you want to deploy.</blockquote>",
+        parse_mode=ParseMode.HTML,
+        reply_markup=_type_keyboard(),
+    )
+
+
+@Client.on_callback_query(filters.regex(r"^hostify:deploy:type:(python|java|docker)$"))
+async def deploy_type_callback(client: Client, query):
+    user = query.from_user
+    if user is None or query.message is None or not await is_owner_or_admin(user.id):
+        await query.answer("Deployment access is restricted.", show_alert=True)
+        return
+
+    runtime_type = (query.data or "").rsplit(":", 1)[-1]
+    async with _session_lock:
+        session = _get_valid_session(user.id, query.message.chat.id)
+        if session is None or session.stage != "type":
+            await query.answer("This deployment session has expired. Send /deploy again.", show_alert=True)
+            return
+        session.runtime_type = runtime_type
+        session.stage = "repository"
+        session.created_at = time.monotonic()
+
+    await query.message.edit_text(
+        f"<blockquote>Selected: {runtime_type.title()}\n\nSend the GitHub repository URL.</blockquote>",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([[
+            button("Close", callback_data="hostify:ui:close", style="danger")
+        ]]),
+        disable_web_page_preview=True,
+    )
+    await query.answer()
 
 
 @Client.on_message(filters.command(["cancel", "cancle"]) & filters.private)
@@ -137,7 +174,6 @@ async def cancel_deploy(client: Client, message):
     user = message.from_user
     if user is None or not await is_owner_or_admin(user.id):
         return
-
     if cancel_admin_add(user.id, message.chat.id):
         await _reply(message, "Admin creation cancelled.")
         return
@@ -156,36 +192,23 @@ async def cancel_deploy(client: Client, message):
         if session is None or session.chat_id != message.chat.id:
             await _reply(message, M.M100_CANCEL_NO_SESSION)
             return
-
         if session.stage == "deploying":
-            await _reply(
-                message,
-                M.M101_CANCEL_LOCKED,
-            )
+            await _reply(message, M.M101_CANCEL_LOCKED)
             return
-
         _sessions.pop(user.id, None)
-
     await _reply(message, M.M116_DEPLOY_CANCELLED)
 
 
-@Client.on_message(
-    filters.private
-    & filters.text
-    & ~filters.regex(r"^/")
-)
+@Client.on_message(filters.private & filters.text & ~filters.regex(r"^/"))
 async def deploy_input_handler(client: Client, message):
     user = message.from_user
     if user is None or not message.text or not await is_owner_or_admin(user.id):
         return
 
-    # Keep each state transition atomic. Never hold the lock while installing
-    # third-party packages or starting an external process.
     async with _session_lock:
         session = _get_valid_session(user.id, message.chat.id)
         if session is None:
             return
-
         if session.stage == "deploying":
             await _reply(message, M.M98_DEPLOY_ALREADY_RUNNING)
             return
@@ -196,7 +219,6 @@ async def deploy_input_handler(client: Client, message):
             except ValueError as exc:
                 await _reply(message, f"{M.M08_INVALID_URL}\n\n{exc}")
                 return
-
             session.stage = "name"
             session.created_at = time.monotonic()
             await _reply(message, M.M09_ASK_NAME, plain=True)
@@ -209,12 +231,9 @@ async def deploy_input_handler(client: Client, message):
             except ValueError:
                 await _reply(message, M.M10_INVALID_NAME)
                 return
-
-            existing = await get_bot(name)
-            if existing:
+            if await get_bot(name):
                 await _reply(message, M.M34_NAME_TAKEN)
                 return
-
             session.name = name
             session.stage = "environment"
             session.created_at = time.monotonic()
@@ -234,14 +253,14 @@ async def deploy_input_handler(client: Client, message):
 
         name = session.name
         repo_url = session.repo_url
-        if not name or not repo_url:
+        runtime_type = session.runtime_type
+        if not name or not repo_url or runtime_type not in {"python", "java", "docker"}:
             _sessions.pop(user.id, None)
             await _reply(message, M.M104_SESSION_INCOMPLETE)
             return
-
         session.stage = "deploying"
 
-    await _reply(message, M.M12_DEPLOYING.format(name=name))
+    await _reply(message, f"Creating your {runtime_type.title()} service on Render: {name}. Deployment may take several minutes.")
 
     try:
         try:
@@ -251,35 +270,39 @@ async def deploy_input_handler(client: Client, message):
             await _reply(message, M.M14_DEPLOY_FAIL.format(name=name, reason=str(exc)[:_MAX_DETAIL_CHARS]))
             return
 
-        success, detail = await deploy_bot(
-            name, repo_url, env_vars,
+        success, detail = await deploy_to_render(
+            name,
+            repo_url,
+            runtime_type,
+            env_vars,
             github_token=github_token,
             deployed_by=user.id,
         )
 
         if success:
-            # Channel notifications are best-effort. A database or Telegram
-            # notification error must never turn a successful deployment into
-            # a user-visible deployment failure.
+            service_id, dashboard_url = detail.split("|", 1)
             try:
                 await post_deploy_announcement(client, name, repo_url, env_vars)
             except Exception:
-                logger.exception(
-                    "Bot %s deployed, but its channel announcement failed",
-                    name,
-                )
-            response = M.M13_DEPLOY_OK.format(name=name, pid=detail)
+                logger.exception("Render service %s deployed, but announcement failed", name)
+            response = (
+                f"Deployment successful: {name}\n"
+                f"Runtime: {runtime_type.title()}\n"
+                f"Render service: {service_id}\n"
+                f"Dashboard: {dashboard_url}"
+            )
         else:
-            safe_detail = str(detail or "Unknown deployment error")[:_MAX_DETAIL_CHARS]
-            response = M.M14_DEPLOY_FAIL.format(name=name, reason=safe_detail)
-
+            response = M.M14_DEPLOY_FAIL.format(
+                name=name,
+                reason=str(detail or "Unknown Render deployment error")[:_MAX_DETAIL_CHARS],
+            )
         await _reply(message, response)
 
     except asyncio.CancelledError:
-        logger.warning("Deployment handler cancelled for bot %s", name)
+        logger.warning("Render deployment handler cancelled for %s", name)
         raise
     except Exception:
-        logger.exception("Unexpected deployment-flow failure for bot %s", name)
+        logger.exception("Unexpected Render deployment-flow failure for %s", name)
         await _reply(message, M.M105_DEPLOY_UNEXPECTED_FAILURE.format(name=name))
     finally:
         async with _session_lock:
