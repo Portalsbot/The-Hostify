@@ -136,9 +136,7 @@ async def deploy_to_render(
 
     try:
         branch, files = await _inspect_repository(repo_url, github_token, runtime_type)
-        global _current_files
-        _current_files = files
-        created = await _create_render_service(name, repo_url, runtime_type, env_vars, branch)
+        created = await _create_render_service(name, repo_url, runtime_type, env_vars, branch, files)
         service = created.get("service") or {}
         deploy = created.get("deploy") or {}
         service_id = service.get("id")
@@ -187,5 +185,3 @@ async def deploy_to_render(
         logger.exception("Unexpected Render deployment failure for %s", name)
         return False, "Unexpected Render deployment error. Check Hostify logs and the Render service dashboard."
 
-
-_current_files: set[str] = set()
