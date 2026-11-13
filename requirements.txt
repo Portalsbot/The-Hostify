@@ -1,5 +1,6 @@
 pyrofork>=2.3.69,<3
 pymongo>=4.9,<5
+dnspython>=2.6,<3
 python-dotenv>=1.0,<2
 psutil>=6,<8
 aiohttp>=3.10,<4
