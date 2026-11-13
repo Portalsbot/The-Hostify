@@ -46,7 +46,7 @@ The App should have Repository permissions:
 - Contents: Read-only
 - Metadata: Read-only
 
-Install the App on the GitHub account and grant it access only to repositories Hostify is intended to deploy.
+Install the App on the GitHub account and grant it access only to repositories Hostify is intended to deploy. Separately, connect the same GitHub account to Render and authorize Render to access each repository you intend to deploy; the GitHub App connection inside Hostify does not automatically grant Render repository access.
 
 Use `/github` in the owner account to check the connection and list accessible repositories. During deployment, Hostify obtains a short-lived installation token for a selected private repository. The token is not placed in the clone URL or saved in the database.
 
