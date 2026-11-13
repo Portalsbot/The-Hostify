@@ -12,7 +12,7 @@ from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database import get_bot, list_bots, update_bot_env
-from manager import delete_bot, read_logs, restart_bot, stop_bot
+from manager import delete_bot, read_logs, restart_bot, start_bot, stop_bot
 from smallcaps import sc
 from ui_buttons import button
 from .guard import is_owner, is_owner_or_admin
@@ -342,7 +342,7 @@ async def bot_callback(client: Client, query):
         ok, detail = await restart_bot(name)
         result = "Deployment restarted." if ok else f"Could not restart deployment: {detail}"
     elif action == "run":
-        ok, detail = await restart_bot(name)
+        ok, detail = await start_bot(name)
         result = "Deployment started." if ok else f"Could not start deployment: {detail}"
     elif action == "delete":
         token = secrets.token_urlsafe(9)
