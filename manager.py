@@ -141,6 +141,15 @@ async def stop_bot(name: str) -> tuple[bool, str | None]:
     return True, None
 
 
+async def start_bot(name: str) -> tuple[bool, str | None]:
+    bot = await get_bot(name)
+    if not bot:
+        return False, "not_found"
+    if bot.get("deployment_provider") == "render":
+        return await render_service_action(name, "run")
+    return await launch_existing(name, bot.get("env_vars") or {})
+
+
 async def restart_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
