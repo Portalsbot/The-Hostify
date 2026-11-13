@@ -141,7 +141,7 @@ async def _failure_log_excerpt(session, service_id: str, headers: dict, env_vars
                 if isinstance(secret, str) and len(secret) >= 6:
                     line = line.replace(secret, "[REDACTED]")
             lines.append(line)
-        return "\\n".join(lines)[-1400:]
+        return "\n".join(lines)[-1400:]
     except Exception as exc:
         logger.info("Could not retrieve Render build-log excerpt for %s: %s", service_id, exc)
         return ""
@@ -203,8 +203,8 @@ async def deploy_to_render(
                     excerpt = await _failure_log_excerpt(session, service_id, headers, env_vars)
                     reason = f"Render deployment status: {last_status}."
                     if excerpt:
-                        reason += "\\n\\nRecent build output:\\n" + excerpt
-                    reason += f"\\n\\nFull logs: https://dashboard.render.com/web/{service_id}"
+                        reason += "\n\nRecent build output:\n" + excerpt
+                    reason += f"\n\nFull logs: https://dashboard.render.com/web/{service_id}"
                     return False, reason
         await update_render_deployment(name, status="deploying", deploy_status=last_status)
         return False, f"Render deployment did not finish within {_DEPLOY_TIMEOUT // 60} minutes. Check its progress and logs: https://dashboard.render.com/web/{service_id}"
