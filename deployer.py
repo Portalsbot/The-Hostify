@@ -426,9 +426,14 @@ async def deploy_bot(
     """
     if not ALLOW_UNSANDBOXED_DEPLOYMENTS:
         return False, (
-            "Deployment is disabled because customer code is not sandboxed. "
-            "Set ALLOW_UNSANDBOXED_DEPLOYMENTS=true only for repositories you personally trust."
+            "Deployment is disabled. Set ALLOW_UNSANDBOXED_DEPLOYMENTS=true only for repositories you trust."
         )
+    if runtime_type not in {"python", "docker"}:
+        return False, "Choose either Python or Docker deployment."
+    if runtime_type == "docker":
+        available, detail = await _docker_engine_status()
+        if not available:
+            return False, detail
 
     try:
         name = _validate_name(name)
@@ -496,6 +501,38 @@ async def deploy_bot(
             if clone_code != 0:
                 logger.error("Git clone failed for %s: %s", name, clone_log[-3_000:])
                 return False, "Git clone failed; inspect the deployment log on the server."
+
+            if runtime_type == "docker":
+                dockerfile = bot_dir / "Dockerfile"
+                if dockerfile.is_symlink() or not dockerfile.is_file():
+                    return False, "Docker deployment requires a Dockerfile in the repository root."
+                launched, container_id = await _launch_docker_container(
+                    bot_dir, name, safe_env, build=True, replace=True
+                )
+                if not launched:
+                    logger.error("Docker deployment failed for %s: %s", name, container_id[-2500:])
+                    return False, container_id
+                notify_channel = safe_env.get("NOTIFY_CHANNEL")
+                try:
+                    await add_bot(
+                        name, repo_url, safe_env, notify_channel,
+                        deployed_by=deployed_by, runtime_type="docker", container_id=container_id,
+                    )
+                    await update_status(name, "running", None, None)
+                except Exception:
+                    await _docker_command(["rm", "--force", _docker_names(name)[0]], timeout=30)
+                    logger.exception("Database registration failed for Docker bot %s", name)
+                    return False, "Docker container started but database registration failed; container was removed."
+                token = safe_env.get("BOT_TOKEN")
+                if token:
+                    username = await _fetch_bot_username(token)
+                    if username:
+                        try:
+                            await set_bot_username(name, username)
+                        except Exception:
+                            logger.exception("Could not save Telegram username for Docker bot %s", name)
+                logger.info("Docker bot %s deployed successfully (container=%s)", name, container_id[:12])
+                return True, f"container {container_id[:12]}"
 
             venv_path = bot_dir / "venv"
             if venv_path.exists() or venv_path.is_symlink():
@@ -592,6 +629,31 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
         bot_dir = _bot_directory(name)
         if not bot_dir.is_dir():
             return False, "Bot folder missing."
+
+        if (await get_bot(name) or {}).get("runtime_type", "python") == "docker":
+            container_name, image_name = _docker_names(name)
+            available, detail = await _docker_engine_status()
+            if not available:
+                return False, detail
+            state_code, state = await _docker_command(
+                ["inspect", "--format", "{{.State.Status}}", container_name], timeout=10
+            )
+            if state_code == 0:
+                if state.strip().lower() == "running":
+                    await update_status(name, "running", None, None)
+                    return True, container_name
+                code, output = await _docker_command(["start", container_name], timeout=30)
+                if code != 0:
+                    return False, output or "Could not start the existing Docker container."
+                await update_status(name, "running", None, None)
+                return True, container_name
+            launched, detail = await _launch_docker_container(
+                bot_dir, name, safe_env, build=True, replace=False
+            )
+            if launched:
+                await update_status(name, "running", None, None)
+                return True, detail
+            return False, detail
 
         process = await _launch(bot_dir, safe_env)
         try:
