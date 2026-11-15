@@ -120,16 +120,19 @@ def _detail_text(bot: dict) -> str:
     env_keys = sorted(key for key in env if key != "NOTIFY_CHANNEL")
     created = bot.get("created_at")
     created_text = created.strftime("%Y-%m-%d %H:%M UTC") if isinstance(created, datetime) else "Unknown"
+    runtime_type = str(bot.get("runtime_type") or "python").title()
     pid = bot.get("pid") or "—"
+    process_line = f"Container: {bot.get('container_id', 'managed by Docker')}" if runtime_type == "Docker" else f"PID: {pid}"
+    username = "@" + str(bot.get("bot_username")) if bot.get("bot_username") else "Not detected"
     return (
-        f"BOT SETTINGS: {name}\n\n"
-        f"Status: {bot.get('status', 'unknown')}\n"
-        f"Bot username: @{bot.get('bot_username')}" if bot.get("bot_username") else
-        f"BOT SETTINGS: {name}\n\nStatus: {bot.get('status', 'unknown')}\nBot username: Not detected"
-    ) + (
-        f"\nPID: {pid}\nRepository: {bot.get('repo_url', 'Unknown')}\n"
-        f"Deployed by ID: {bot.get('deployed_by', 'Legacy deployment')}\n"
-        f"Created: {created_text}\nEnvironment variables: {len(env_keys)}"
+        f"BOT SETTINGS: {name}\\n\\n"
+        f"Status: {bot.get('status', 'unknown')}\\n"
+        f"Runtime: {runtime_type}\\n"
+        f"Bot username: {username}\\n"
+        f"{process_line}\\n"
+        f"Repository: {bot.get('repo_url', 'Unknown')}\\n"
+        f"Deployed by ID: {bot.get('deployed_by', 'Legacy deployment')}\\n"
+        f"Created: {created_text}\\nEnvironment variables: {len(env_keys)}"
     )
 
 
@@ -320,25 +323,15 @@ async def bot_callback(client: Client, query):
         return
 
     if action == "logs":
-        if bot.get("deployment_provider") == "render":
-            service_id = str(bot.get("render_service_id") or "")
-            dashboard = str(bot.get("service_url") or ("https://dashboard.render.com/web/" + service_id))
-            await query.message.edit_text(
-                _quoted("Render deployment logs for " + name + " are available in the Render dashboard."),
-                parse_mode=ParseMode.HTML,
-                reply_markup=_keyboard([
-                    [button("Open Render Dashboard", url=dashboard, style="success")],
-                    [button("Back", callback_data="hostify:bot:view:" + name + ":" + back_category + ":" + str(back_page))],
-                ]),
-                disable_web_page_preview=True,
-            )
-            await query.answer()
-            return
         try:
-            lines = read_logs(name, 40)
-            output = f"LAST {len(lines or [])} LOG LINES: {name}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
-            await query.message.edit_text(_quoted(output[-3400:]), parse_mode=ParseMode.HTML,
-                reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]))
+            runtime_type = str(bot.get("runtime_type") or "python")
+            lines = read_logs(name, 40, runtime_type=runtime_type)
+            output = f"LAST {len(lines or [])} LOG LINES: {name}\\n\\n" + ("\\n".join(lines) if lines else "No log output is available.")
+            await query.message.edit_text(
+                _quoted(output[-3400:]),
+                parse_mode=ParseMode.HTML,
+                reply_markup=_keyboard([[InlineKeyboardButton("Back", callback_data=f"hostify:bot:view:{name}:{back_category}:{back_page}")]]),
+            )
             await query.answer()
         except Exception:
             logger.exception("Could not read logs for %s", name)
