@@ -304,8 +304,8 @@ async def _docker_command(
             env={
                 "PATH": os.getenv("PATH", "/usr/local/bin:/usr/bin:/bin"),
                 "HOME": os.getenv("HOME", "/tmp"),
-                "DOCKER_HOST": os.getenv("DOCKER_HOST", ""),
-                "DOCKER_CONFIG": os.getenv("DOCKER_CONFIG", ""),
+                **({"DOCKER_HOST": os.environ["DOCKER_HOST"]} if os.getenv("DOCKER_HOST") else {}),
+                **({"DOCKER_CONFIG": os.environ["DOCKER_CONFIG"]} if os.getenv("DOCKER_CONFIG") else {}),
             },
         )
     except FileNotFoundError:
@@ -325,7 +325,7 @@ async def _docker_engine_status() -> tuple[bool, str]:
     detail = output.strip() or "Docker Engine is not responding."
     if "Cannot connect" in detail or "permission denied" in detail.lower():
         detail += (
-            "\\nA Docker CLI alone is insufficient; this host must expose a running Docker Engine "
+            "\nA Docker CLI alone is insufficient; this host must expose a running Docker Engine "
             "with permission for the Hostify process. Native Render Python services do not provide one."
         )
     return False, detail[:1200]
@@ -337,10 +337,10 @@ def _write_docker_env(bot_dir: Path, env_vars: dict[str, str]) -> Path:
         raise ValueError("Refusing to write Docker environment values through a symbolic link.")
     lines = []
     for key, value in env_vars.items():
-        if "\\n" in value or "\\r" in value:
+        if "\n" in value or "\\r" in value:
             raise ValueError(f"Docker environment variable {key} cannot contain newline characters.")
         lines.append(f"{key}={value}")
-    path.write_text("\\n".join(lines) + ("\\n" if lines else ""), encoding="utf-8")
+    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
     path.chmod(0o600)
     return path
 
@@ -377,7 +377,7 @@ async def _launch_docker_container(
             timeout=PIP_TIMEOUT_SECONDS,
         )
         if code != 0:
-            return False, f"Docker image build failed (exit {code}):\\n{output[-2600:]}"
+            return False, f"Docker image build failed (exit {code}):\n{output[-2600:]}"
 
     if replace:
         await _docker_command(["rm", "--force", container_name], timeout=30)
@@ -400,14 +400,14 @@ async def _launch_docker_container(
         timeout=60,
     )
     if code != 0:
-        return False, f"Docker container start failed (exit {code}):\\n{output[-2600:]}"
+        return False, f"Docker container start failed (exit {code}):\n{output[-2600:]}"
 
     container_id = output.strip().splitlines()[-1] if output.strip() else container_name
     await asyncio.sleep(1)
     if not await _docker_container_running(container_name):
         _, logs = await _docker_command(["logs", "--tail", "60", container_name], timeout=15)
         await _docker_command(["rm", "--force", container_name], timeout=30)
-        return False, "Docker container exited during startup.\\n" + (logs[-2600:] or output[-1200:])
+        return False, "Docker container exited during startup.\n" + (logs[-2600:] or output[-1200:])
     return True, container_id
 
 
