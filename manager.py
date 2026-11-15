@@ -155,7 +155,7 @@ async def restart_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
-    if bot.get("runtime_type", "python") == "docker":
+    if bot.get("runtime_type", "python") in {"docker", "java"}:
         bot_dir = _bot_directory(name)
         if bot_dir.is_dir():
             # Recreate from the saved encrypted MongoDB environment so edited
