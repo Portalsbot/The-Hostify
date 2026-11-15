@@ -170,7 +170,12 @@ async def restart_bot(name: str) -> tuple[bool, str | None]:
             container_name, _ = _docker_names(name)
             code, detail = await _docker_command(["restart", container_name], timeout=45)
             if code != 0:
-                return False, detail or "Docker could not restart the container."
+                # If the container vanished with the host runtime, rebuild it
+                # from its saved GitHub repository and encrypted MongoDB config.
+                restored, detail = await launch_existing(name, bot.get("env_vars") or {})
+                if not restored:
+                    return False, detail or "Docker container could not be restarted or recovered."
+                return True, detail
         await update_status(name, "running", None, None)
         return True, _docker_names(name)[0]
 
