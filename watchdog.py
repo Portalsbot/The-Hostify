@@ -57,8 +57,10 @@ async def _alive(bot: dict) -> bool:
 
 
 async def watchdog_loop(client) -> None:
+    first_cycle = True
     while True:
-        await asyncio.sleep(600)
+        await asyncio.sleep(30 if first_cycle else 600)
+        first_cycle = False
 
         try:
             bots = await list_bots()
