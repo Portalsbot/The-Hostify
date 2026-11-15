@@ -463,7 +463,7 @@ async def deploy_bot(
             "Deployment is disabled. Set ALLOW_UNSANDBOXED_DEPLOYMENTS=true only for repositories you trust."
         )
     if runtime_type not in {"python", "java", "docker"}:
-        return False, "Choose either Python or Docker deployment."
+        return False, "Choose Python, Java, or Docker deployment."
     if runtime_type in {"docker", "java"}:
         available, detail = await _docker_engine_status()
         if not available:
