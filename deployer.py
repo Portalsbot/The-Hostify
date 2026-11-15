@@ -840,3 +840,57 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
     except Exception:
         logger.exception("Unexpected restart failure for bot %s", name)
         return False, "Unexpected restart error. Check controller logs."
+
+
+async def docker_manage(name: str, action: str, env_vars: dict[str, str] | None = None) -> tuple[bool, str]:
+    """Manage a container belonging to one Hostify deployment."""
+    container_name, image_name = _docker_names(name)
+    available, detail = await _docker_engine_status()
+    if not available:
+        return False, detail
+    bot_dir = _bot_directory(name)
+    inspect_code, state = await _docker_command(["inspect", "--format", "{{.State.Status}}", container_name], timeout=10)
+    exists = inspect_code == 0
+    if action == "stop":
+        if not exists:
+            return False, "Docker container does not exist on the current host."
+        if state.strip().lower() != "running":
+            return True, "Container is already stopped."
+        code, output = await _docker_command(["stop", "--time", "10", container_name], timeout=20)
+        return (code == 0, output or ("Container stopped." if code == 0 else "Docker stop failed."))
+    if action == "start":
+        if exists:
+            if state.strip().lower() == "running":
+                return True, container_name
+            code, output = await _docker_command(["start", container_name], timeout=30)
+            return (code == 0, output or (container_name if code == 0 else "Docker start failed."))
+        if not bot_dir.is_dir():
+            return False, "Docker container and local project folder are both missing. The source can be cloned again, but the previous image is not stored on this host."
+        return await _launch_docker_container(bot_dir, name, env_vars or {}, build=True, replace=False)
+    if action == "restart":
+        if bot_dir.is_dir() and env_vars is not None:
+            return await _launch_docker_container(bot_dir, name, env_vars, build=False, replace=True)
+        if exists:
+            code, output = await _docker_command(["restart", "--time", "10", container_name], timeout=30)
+            if code == 0 and await _docker_container_running(container_name):
+                return True, container_name
+            return False, output or "Docker container did not return to running state."
+        if not bot_dir.is_dir():
+            return False, "Docker container and local project folder are both missing."
+        return await _launch_docker_container(bot_dir, name, env_vars or {}, build=True, replace=False)
+    if action == "delete":
+        if exists:
+            code, output = await _docker_command(["rm", "--force", container_name], timeout=30)
+            if code != 0:
+                return False, output or "Could not remove Docker container."
+        await _docker_command(["volume", "rm", "--force", _docker_volume_name(name)], timeout=30)
+        await _docker_command(["image", "rm", "--force", image_name], timeout=30)
+        return True, "Docker container removed."
+    if action == "logs":
+        if not exists:
+            return False, "Docker container does not exist on the current host."
+        code, output = await _docker_command(["logs", "--tail", "40", container_name], timeout=15)
+        if code != 0:
+            return False, output or "Could not read Docker logs."
+        return True, output or "No container logs are available."
+    return False, "Unsupported Docker action."
