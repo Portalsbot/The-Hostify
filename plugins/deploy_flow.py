@@ -148,6 +148,12 @@ async def deploy_type_callback(client: Client, query):
         return
 
     runtime_type = (query.data or "").rsplit(":", 1)[-1]
+    if runtime_type == "docker":
+        from deployer import _docker_engine_status
+        available, detail = await _docker_engine_status()
+        if not available:
+            await query.answer(str(detail)[:190], show_alert=True)
+            return
     async with _session_lock:
         session = _get_valid_session(user.id, query.message.chat.id)
         if session is None or session.stage != "type":
