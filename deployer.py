@@ -315,7 +315,7 @@ async def _docker_command(
             },
         )
     except FileNotFoundError:
-        return 127, "Docker CLI is not installed on this Hostify host."
+        return 127, "Docker deployment is unavailable: the Docker CLI is not installed. A working Docker Engine is also required. Native Render Python services do not provide one."
     try:
         output, _ = await asyncio.wait_for(process.communicate(), timeout=timeout)
     except asyncio.TimeoutError:
