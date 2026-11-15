@@ -521,7 +521,8 @@ async def deploy_bot(
                     shutil.rmtree(askpass_dir, ignore_errors=True)
             if clone_code != 0:
                 logger.error("Git clone failed for %s: %s", name, clone_log[-3_000:])
-                return False, "Git clone failed; inspect the deployment log on the server."
+                shutil.rmtree(bot_dir, ignore_errors=True)
+                return False, f"Git clone failed: {clone_log[-1800:] or 'inspect the controller deployment log.'"
 
             if runtime_type == "docker":
                 dockerfile = bot_dir / "Dockerfile"
@@ -560,6 +561,7 @@ async def deploy_bot(
 
             venv_path = bot_dir / "venv"
             if venv_path.exists() or venv_path.is_symlink():
+                shutil.rmtree(bot_dir, ignore_errors=True)
                 return False, "Repository contains a reserved venv path; remove it and redeploy."
 
             venv_code, venv_log = await _run_logged(
@@ -576,11 +578,13 @@ async def deploy_bot(
             )
             if venv_code != 0:
                 logger.error("Virtual environment creation failed for %s: %s", name, venv_log[-3_000:])
-                return False, "Virtual environment creation failed; inspect deploy.log on the server."
+                shutil.rmtree(bot_dir, ignore_errors=True)
+                return False, f"Virtual environment creation failed: {venv_log[-1800:] or 'unknown error.'"
 
             requirements = bot_dir / "requirements.txt"
             if requirements.exists():
                 if requirements.is_symlink() or not requirements.is_file():
+                    shutil.rmtree(bot_dir, ignore_errors=True)
                     return False, "requirements.txt must be a regular file, not a symlink."
                 pip_code, pip_log = await _run_logged(
                     [str(venv_path / "bin" / "python"), "-m", "pip", "install", "--disable-pip-version-check", "--no-input", "-r", str(requirements)],
@@ -598,9 +602,11 @@ async def deploy_bot(
                 )
                 if pip_code != 0:
                     logger.error("Dependency installation failed for %s: %s", name, pip_log[-3_000:])
-                    return False, "Dependency installation failed; inspect deploy.log on the server."
+                    shutil.rmtree(bot_dir, ignore_errors=True)
+                    return False, f"Dependency installation failed: {pip_log[-1800:] or 'unknown error.'"
 
             if _find_entry(bot_dir) is None:
+                shutil.rmtree(bot_dir, ignore_errors=True)
                 return False, "No entry point (main.py, bot.py, or app.py) found in repository root."
 
             process = await _launch(bot_dir, safe_env)
@@ -619,6 +625,7 @@ async def deploy_bot(
             except Exception:
                 await _terminate_process(process)
                 logger.exception("Database registration failed for bot %s", name)
+                shutil.rmtree(bot_dir, ignore_errors=True)
                 return False, "The bot started but database registration failed; process was stopped."
 
             token = safe_env.get("BOT_TOKEN")
