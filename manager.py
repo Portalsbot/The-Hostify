@@ -129,7 +129,7 @@ async def stop_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
-    if bot.get("runtime_type", "python") == "docker":
+    if bot.get("runtime_type", "python") in {"docker", "java"}:
         container_name, _ = _docker_names(name)
         code, output = await _docker_command(["stop", container_name], timeout=30)
         if code != 0 and "No such container" not in output:
@@ -222,7 +222,7 @@ def read_logs(name: str, lines: int = 20, runtime_type: str = "python") -> list[
     if not isinstance(lines, int) or not 1 <= lines <= 200:
         raise ValueError("Log line count must be between 1 and 200.")
 
-    if runtime_type == "docker":
+    if runtime_type in {"docker", "java"}:
         container_name, _ = _docker_names(name)
         import subprocess
         try:
