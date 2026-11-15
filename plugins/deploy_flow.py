@@ -10,8 +10,8 @@ from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup
 
-import messages as M
 from config import ALLOW_UNSANDBOXED_DEPLOYMENTS
+import messages as M
 from database import get_bot
 from deployer import deploy_bot, _validate_env_vars, _validate_name, _validate_repo_url
 from github_app import GitHubAppError, get_installation_token_for_repository
@@ -25,7 +25,6 @@ from .channel import post_deploy_announcement
 from ui_buttons import button
 
 logger = logging.getLogger("hostify.plugins.deploy_flow")
-
 _SESSION_TTL_SECONDS = 15 * 60
 _MAX_DETAIL_CHARS = 2_000
 
@@ -59,13 +58,10 @@ async def _reply(message, text: str, *, plain: bool = False):
 def _type_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [button("Python", callback_data="hostify:deploy:type:python", style="success")],
+        [button("Java", callback_data="hostify:deploy:type:java")],
         [button("Docker", callback_data="hostify:deploy:type:docker")],
         [button("Close", callback_data="hostify:ui:close", style="danger")],
     ])
-
-
-def _validate_github_url(value: str) -> str:
-    return _validate_repo_url(value)
 
 
 def _parse_environment(text: str) -> dict[str, str]:
@@ -90,15 +86,10 @@ def _get_valid_session(user_id: int, chat_id: int) -> DeploySession | None:
     session = _sessions.get(user_id)
     if session is None:
         return None
-    if (
-        session.stage != "deploying"
-        and time.monotonic() - session.created_at > _SESSION_TTL_SECONDS
-    ):
+    if session.stage != "deploying" and time.monotonic() - session.created_at > _SESSION_TTL_SECONDS:
         _sessions.pop(user_id, None)
         return None
-    if session.chat_id != chat_id:
-        return None
-    return session
+    return session if session.chat_id == chat_id else None
 
 
 @Client.on_message(filters.command("deploy") & filters.private)
@@ -110,29 +101,14 @@ async def deploy_command(client: Client, message):
         await _reply(message, "Deployment access is restricted to the owner and approved admins.")
         return
     if not ALLOW_UNSANDBOXED_DEPLOYMENTS:
-        await _reply(
-            message,
-            "Local deployment is disabled. Set ALLOW_UNSANDBOXED_DEPLOYMENTS=true in Hostify's environment to allow trusted repositories to run on this host.",
-        )
+        await _reply(message, f"{M.M74_NO_DEPLOY_ACCESS}\n\n{M.M75_DEPLOY_TRUST_WARNING}")
         return
-
     async with _session_lock:
         existing = _sessions.get(user.id)
-        if existing and (
-            existing.stage == "deploying"
-            or time.monotonic() - existing.created_at <= _SESSION_TTL_SECONDS
-        ):
-            await _reply(
-                message,
-                M.M98_DEPLOY_ALREADY_RUNNING if existing.stage == "deploying" else M.M99_DEPLOY_SESSION_ACTIVE,
-            )
+        if existing and (existing.stage == "deploying" or time.monotonic() - existing.created_at <= _SESSION_TTL_SECONDS):
+            await _reply(message, M.M98_DEPLOY_ALREADY_RUNNING if existing.stage == "deploying" else M.M99_DEPLOY_SESSION_ACTIVE)
             return
-        _sessions[user.id] = DeploySession(
-            chat_id=message.chat.id,
-            stage="type",
-            created_at=time.monotonic(),
-        )
-
+        _sessions[user.id] = DeploySession(chat_id=message.chat.id, stage="type", created_at=time.monotonic())
     await message.reply_text(
         "<blockquote>Select what you want to deploy.</blockquote>",
         parse_mode=ParseMode.HTML,
@@ -140,20 +116,16 @@ async def deploy_command(client: Client, message):
     )
 
 
-@Client.on_callback_query(filters.regex(r"^hostify:deploy:type:(python|docker)$"))
+@Client.on_callback_query(filters.regex(r"^hostify:deploy:type:(python|java|docker)$"))
 async def deploy_type_callback(client: Client, query):
     user = query.from_user
     if user is None or query.message is None or not await is_owner_or_admin(user.id):
         await query.answer("Deployment access is restricted.", show_alert=True)
         return
-
+    if query.message.chat.type.value != "private":
+        await query.answer("Open /deploy in the private chat.", show_alert=True)
+        return
     runtime_type = (query.data or "").rsplit(":", 1)[-1]
-    if runtime_type == "docker":
-        from deployer import _docker_engine_status
-        available, detail = await _docker_engine_status()
-        if not available:
-            await query.answer(str(detail)[:190], show_alert=True)
-            return
     async with _session_lock:
         session = _get_valid_session(user.id, query.message.chat.id)
         if session is None or session.stage != "type":
@@ -162,13 +134,13 @@ async def deploy_type_callback(client: Client, query):
         session.runtime_type = runtime_type
         session.stage = "repository"
         session.created_at = time.monotonic()
-
+    note = ""
+    if runtime_type in {"docker", "java"}:
+        note = "\n\nThis option requires a Dockerfile in the repository root and a working Docker Engine on the Hostify host."
     await query.message.edit_text(
-        f"<blockquote>Selected: {runtime_type.title()}\n\nSend the GitHub repository URL.</blockquote>",
+        f"<blockquote>Selected: {runtime_type.title()}\n\nSend the GitHub repository URL.{html.escape(note)}</blockquote>",
         parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([[
-            button("Close", callback_data="hostify:ui:close", style="danger")
-        ]]),
+        reply_markup=InlineKeyboardMarkup([[button("Close", callback_data="hostify:ui:close", style="danger")]]),
         disable_web_page_preview=True,
     )
     await query.answer()
@@ -191,7 +163,6 @@ async def cancel_deploy(client: Client, message):
     if cancel_message_edit(user.id, message.chat.id):
         await _reply(message, "Message editing cancelled.")
         return
-
     async with _session_lock:
         session = _sessions.get(user.id)
         if session is None or session.chat_id != message.chat.id:
@@ -209,7 +180,6 @@ async def deploy_input_handler(client: Client, message):
     user = message.from_user
     if user is None or not message.text or not await is_owner_or_admin(user.id):
         return
-
     async with _session_lock:
         session = _get_valid_session(user.id, message.chat.id)
         if session is None:
@@ -217,10 +187,9 @@ async def deploy_input_handler(client: Client, message):
         if session.stage == "deploying":
             await _reply(message, M.M98_DEPLOY_ALREADY_RUNNING)
             return
-
         if session.stage == "repository":
             try:
-                session.repo_url = _validate_github_url(message.text)
+                session.repo_url = _validate_repo_url(message.text)
             except ValueError as exc:
                 await _reply(message, f"{M.M08_INVALID_URL}\n\n{exc}")
                 return
@@ -228,7 +197,6 @@ async def deploy_input_handler(client: Client, message):
             session.created_at = time.monotonic()
             await _reply(message, M.M09_ASK_NAME, plain=True)
             return
-
         if session.stage == "name":
             name = message.text.strip()
             try:
@@ -242,32 +210,31 @@ async def deploy_input_handler(client: Client, message):
             session.name = name
             session.stage = "environment"
             session.created_at = time.monotonic()
-            docker_note = "\n\nThe selected Docker repository must contain a Dockerfile in its root. Docker deployment also requires a reachable Docker Engine on the Hostify host." if session.runtime_type == "docker" else ""
-            await _reply(message, M.M11_ASK_ENV + docker_note, plain=True)
+            selected = (session.runtime_type or "python").title()
+            prompt = M.M11_ASK_ENV
+            if session.runtime_type in {"docker", "java"}:
+                prompt += "\n\nA Dockerfile must exist in the repository root. The Hostify host must have Docker CLI access and a running Docker Engine."
+            await _reply(message, prompt, plain=True)
             return
-
         if session.stage != "environment":
             _sessions.pop(user.id, None)
             await _reply(message, M.M102_SESSION_INVALID)
             return
-
         try:
             env_vars = _parse_environment(message.text)
         except ValueError as exc:
             await _reply(message, M.M103_ENV_INVALID.format(reason=str(exc)))
             return
-
         name = session.name
         repo_url = session.repo_url
-        runtime_type = session.runtime_type
-        if not name or not repo_url or runtime_type not in {"python", "docker"}:
+        runtime_type = session.runtime_type or "python"
+        if not name or not repo_url or runtime_type not in {"python", "java", "docker"}:
             _sessions.pop(user.id, None)
             await _reply(message, M.M104_SESSION_INCOMPLETE)
             return
         session.stage = "deploying"
 
-    await _reply(message, f"Cloning and deploying {name} locally on the Hostify host using {runtime_type.title()}.")
-
+    status_message = await _reply(message, f"Preparing {runtime_type.title()} deployment for {name}. Cloning and starting it on the Hostify host.")
     try:
         try:
             github_token = await get_installation_token_for_repository(repo_url)
@@ -275,38 +242,26 @@ async def deploy_input_handler(client: Client, message):
             logger.warning("GitHub repository authorization failed for %s: %s", repo_url, exc)
             await _reply(message, M.M14_DEPLOY_FAIL.format(name=name, reason=str(exc)[:_MAX_DETAIL_CHARS]))
             return
-
         success, detail = await deploy_bot(
-            name,
-            repo_url,
-            env_vars,
+            name, repo_url, env_vars,
             github_token=github_token,
             deployed_by=user.id,
             runtime_type=runtime_type,
         )
-
         if success:
             try:
                 await post_deploy_announcement(client, name, repo_url, env_vars)
             except Exception:
-                logger.exception("Bot %s deployed, but its channel announcement failed", name)
-            response = (
-                f"Deployment successful: {name}\n"
-                f"Runtime: {runtime_type.title()}\n"
-                f"Process / container: {detail}"
-            )
+                logger.exception("Deployment succeeded for %s, but announcement failed", name)
+            response = f"Deployment successful: {name}\nRuntime: {runtime_type.title()}\nProcess: {detail}"
         else:
-            response = M.M14_DEPLOY_FAIL.format(
-                name=name,
-                reason=str(detail or "Unknown deployment error")[:_MAX_DETAIL_CHARS],
-            )
+            response = M.M14_DEPLOY_FAIL.format(name=name, reason=str(detail or "Unknown deployment error")[:_MAX_DETAIL_CHARS])
         await _reply(message, response)
-
     except asyncio.CancelledError:
         logger.warning("Deployment handler cancelled for %s", name)
         raise
     except Exception:
-        logger.exception("Unexpected deployment-flow failure for %s", name)
+        logger.exception("Unexpected local deployment-flow failure for %s", name)
         await _reply(message, M.M105_DEPLOY_UNEXPECTED_FAILURE.format(name=name))
     finally:
         async with _session_lock:
