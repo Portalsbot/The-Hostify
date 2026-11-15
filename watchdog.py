@@ -11,9 +11,7 @@ import psutil
 
 from config import OWNER_ID
 from database import list_bots, update_status
-from deployer import launch_existing
-from render_deployer import deploy_to_render, is_render_configured
-from github_app import GitHubAppError, get_installation_token_for_repository
+from deployer import launch_existing, _docker_command, _docker_names
 from utils import send_message
 import messages as M
 
@@ -21,8 +19,16 @@ logger = logging.getLogger("hostify.watchdog")
 _PROCESS_TIME_TOLERANCE = 1.5
 
 
-def _alive(bot: dict) -> bool:
-    """Check PID liveness and creation time to avoid PID-reuse false positives."""
+async def _alive(bot: dict) -> bool:
+    """Check Docker state or PID identity before attempting a restart."""
+    if bot.get("runtime_type", "python") == "docker":
+        container_name, _ = _docker_names(str(bot.get("name") or ""))
+        code, output = await _docker_command(
+            ["inspect", "--format", "{{.State.Running}}", container_name],
+            timeout=10,
+        )
+        return code == 0 and output.strip().lower() == "true"
+
     pid = bot.get("pid")
     expected_created_at = bot.get("pid_created_at")
 
@@ -63,13 +69,9 @@ async def watchdog_loop(client) -> None:
             failed: list[str] = []
 
             for bot in bots:
-                # Render-managed services run independently of this controller.
-                # Never restart them from a local folder on the ephemeral filesystem.
-                if bot.get("deployment_provider") == "render":
-                    continue
                 if bot.get("status") != "running":
                     continue
-                if _alive(bot):
+                if await _alive(bot):
                     continue
 
                 name = bot.get("name")
@@ -78,29 +80,6 @@ async def watchdog_loop(client) -> None:
                     continue
 
                 ok, detail = await launch_existing(name, bot.get("env_vars") or {})
-                if not ok and detail == "Bot folder missing." and is_render_configured():
-                    # A Render redeploy erased the legacy local folder. Recreate
-                    # this project as an independent Render service from its GitHub source.
-                    repo_url = bot.get("repo_url")
-                    try:
-                        if not isinstance(repo_url, str) or not repo_url:
-                            raise RuntimeError("Legacy deployment has no GitHub repository URL.")
-                        github_token = await get_installation_token_for_repository(repo_url)
-                        ok, detail = await deploy_to_render(
-                            name,
-                            repo_url,
-                            "python",
-                            bot.get("env_vars") or {},
-                            github_token=github_token,
-                            deployed_by=int(bot.get("deployed_by") or OWNER_ID),
-                        )
-                    except (GitHubAppError, RuntimeError) as exc:
-                        detail = str(exc)
-                        ok = False
-                    if ok:
-                        restarted.append(name)
-                        logger.info("Migrated legacy deployment %s to Render after local folder loss", name)
-                        continue
                 if ok:
                     restarted.append(name)
                 else:
