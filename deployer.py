@@ -753,6 +753,14 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
                 if state.strip().lower() == "running":
                     await update_status(name, "running", None, None)
                     return True, container_name
+                if bot_dir.is_dir():
+                    launched, detail = await _launch_docker_container(
+                        bot_dir, name, safe_env, build=False, replace=True
+                    )
+                    if not launched:
+                        return False, detail
+                    await update_status(name, "running", None, None)
+                    return True, detail
                 code, output = await _docker_command(["start", container_name], timeout=30)
                 if code != 0:
                     return False, output or "Could not start the existing Docker container."
