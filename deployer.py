@@ -290,6 +290,11 @@ def _docker_names(name: str) -> tuple[str, str]:
     return f"hostify-{slug}-{suffix}", f"hostify/{slug}-{suffix}:latest"
 
 
+def _docker_volume_name(name: str) -> str:
+    container_name, _ = _docker_names(name)
+    return f"{container_name}-data"
+
+
 async def _docker_command(
     args: list[str],
     *,
@@ -413,6 +418,7 @@ async def _launch_docker_container(
             "--name", container_name,
             "--restart", "unless-stopped",
             "--init",
+            "--mount", f"type=volume,source={_docker_volume_name(name)},target=/data",
             "--env-file", str(env_file),
             image_name,
         ],
