@@ -689,15 +689,15 @@ async def _restore_docker_bot_folder(name: str, bot_dir: Path, repo_url: str) ->
             askpass_dir = Path(tempfile.mkdtemp(prefix=f".{name}.docker-restore-auth-", dir=str(bot_dir.parent)))
             askpass = askpass_dir / "askpass.sh"
             askpass.write_text(
-                        "#!/bin/sh\n"
-                        "case \"$1\" in\n"
-                        "  *Username*) printf '%s\n' 'x-access-token' ;;\n"
-                        "  *Password*) printf '%s\n' \"$HOSTIFY_GITHUB_TOKEN\" ;;\n"
-                        "  *) exit 1 ;;\n"
-                        "esac\n",
-                        encoding="utf-8",
-                    )
-                    askpass.chmod(0o700)
+                "#!/bin/sh\n"
+                "case \"$1\" in\n"
+                "  *Username*) printf '%s\n' 'x-access-token' ;;\n"
+                "  *Password*) printf '%s\n' \"$HOSTIFY_GITHUB_TOKEN\" ;;\n"
+                "  *) exit 1 ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            askpass.chmod(0o700)
             clone_env.update({
                 "HOME": str(askpass_dir),
                 "GIT_ASKPASS": str(askpass),
@@ -756,15 +756,15 @@ async def _restore_python_bot_folder(name: str, bot_dir: Path, repo_url: str) ->
             askpass_dir = Path(tempfile.mkdtemp(prefix=f".{name}.restore-auth-", dir=str(bot_dir.parent)))
             askpass = askpass_dir / "askpass.sh"
             askpass.write_text(
-                        "#!/bin/sh\n"
-                        "case \"$1\" in\n"
-                        "  *Username*) printf '%s\n' 'x-access-token' ;;\n"
-                        "  *Password*) printf '%s\n' \"$HOSTIFY_GITHUB_TOKEN\" ;;\n"
-                        "  *) exit 1 ;;\n"
-                        "esac\n",
-                        encoding="utf-8",
-                    )
-                    askpass.chmod(0o700)
+                "#!/bin/sh\n"
+                "case \"$1\" in\n"
+                "  *Username*) printf '%s\n' 'x-access-token' ;;\n"
+                "  *Password*) printf '%s\n' \"$HOSTIFY_GITHUB_TOKEN\" ;;\n"
+                "  *) exit 1 ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            askpass.chmod(0o700)
             clone_env.update({
                 "HOME": str(askpass_dir),
                 "GIT_ASKPASS": str(askpass),
