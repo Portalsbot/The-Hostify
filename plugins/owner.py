@@ -379,7 +379,7 @@ async def logs_command(client: Client, message):
             await _reply(message, "No deployment with that name was found.")
             return
         lines = read_logs(parts[1], 40, runtime_type=str(bot.get("runtime_type") or "python")) or []
-        output = f"LAST {len(lines)} LOG LINES: {parts[1]}\\n\\n" + ("\\n".join(lines) if lines else "No log output is available.")
+        output = f"LAST {len(lines)} LOG LINES: {parts[1]}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
         await _reply(message, output[-_LOG_LIMIT:])
     except Exception:
         logger.exception("Could not read deployment logs for %s", parts[1])
@@ -406,17 +406,17 @@ async def settings_callback(client: Client, query):
             bots = await list_bots(limit=2000)
             running = sum(1 for bot in bots if bot.get("status") == "running")
             overview = (
-                "HOSTIFY SYSTEM OVERVIEW\\n\\n"
-                f"Python: {__import__('sys').version.split()[0]}\\n"
-                f"CPU: {cpu:.1f}%\\n"
-                f"RAM: {memory.used / 1024**2:.0f} / {memory.total / 1024**2:.0f} MB\\n"
-                f"Storage: {disk.used / 1024**3:.1f} / {disk.total / 1024**3:.1f} GB\\n"
-                f"Deployments: {running} running / {len(bots)} total\\n"
+                "HOSTIFY SYSTEM OVERVIEW\n\n"
+                f"Python: {__import__('sys').version.split()[0]}\n"
+                f"CPU: {cpu:.1f}%\n"
+                f"RAM: {memory.used / 1024**2:.0f} / {memory.total / 1024**2:.0f} MB\n"
+                f"Storage: {disk.used / 1024**3:.1f} / {disk.total / 1024**3:.1f} GB\n"
+                f"Deployments: {running} running / {len(bots)} total\n"
                 "Database: Connected"
             )
         except Exception:
             logger.exception("System overview check failed")
-            overview = "HOSTIFY SYSTEM OVERVIEW\\n\\nDatabase or system metrics could not be collected. Check Hostify logs."
+            overview = "HOSTIFY SYSTEM OVERVIEW\n\nDatabase or system metrics could not be collected. Check Hostify logs."
         await _edit(query.message, overview, markup=_keyboard([[_button("Back", "hostify:settings:open")]]))
     elif action == "github":
         await _edit(
@@ -443,7 +443,7 @@ async def settings_callback(client: Client, query):
         cancel_admin_add(user.id, query.message.chat.id)
         await _edit(
             query.message,
-            "ADMIN MANAGEMENT\\n\\nAdd a trusted administrator, remove existing access, or view the current admin team.",
+            "ADMIN MANAGEMENT\n\nAdd a trusted administrator, remove existing access, or view the current admin team.",
             markup=_keyboard([
                 [
                     _button("Add Admin", "hostify:adminpanel:add", style="success"),
