@@ -11,10 +11,10 @@ from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup
 
 import messages as M
+from config import ALLOW_UNSANDBOXED_DEPLOYMENTS
 from database import get_bot
-from deployer import _validate_env_vars, _validate_name, _validate_repo_url
+from deployer import deploy_bot, _validate_env_vars, _validate_name, _validate_repo_url
 from github_app import GitHubAppError, get_installation_token_for_repository
-from render_deployer import deploy_to_render, is_render_configured
 from utils import format_output
 from .guard import is_owner_or_admin
 from .admins import cancel_admin_add
@@ -59,7 +59,6 @@ async def _reply(message, text: str, *, plain: bool = False):
 def _type_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [button("Python", callback_data="hostify:deploy:type:python", style="success")],
-        [button("Java", callback_data="hostify:deploy:type:java")],
         [button("Docker", callback_data="hostify:deploy:type:docker")],
         [button("Close", callback_data="hostify:ui:close", style="danger")],
     ])
@@ -110,10 +109,10 @@ async def deploy_command(client: Client, message):
     if not await is_owner_or_admin(user.id):
         await _reply(message, "Deployment access is restricted to the owner and approved admins.")
         return
-    if not is_render_configured():
+    if not ALLOW_UNSANDBOXED_DEPLOYMENTS:
         await _reply(
             message,
-            "Render deployment is not configured yet. Add RENDER_API_KEY and RENDER_WORKSPACE_ID to Hostify's Render environment, then redeploy Hostify.",
+            "Local deployment is disabled. Set ALLOW_UNSANDBOXED_DEPLOYMENTS=true in Hostify's environment to allow trusted repositories to run on this host.",
         )
         return
 
@@ -141,7 +140,7 @@ async def deploy_command(client: Client, message):
     )
 
 
-@Client.on_callback_query(filters.regex(r"^hostify:deploy:type:(python|java|docker)$"))
+@Client.on_callback_query(filters.regex(r"^hostify:deploy:type:(python|docker)$"))
 async def deploy_type_callback(client: Client, query):
     user = query.from_user
     if user is None or query.message is None or not await is_owner_or_admin(user.id):
@@ -237,7 +236,8 @@ async def deploy_input_handler(client: Client, message):
             session.name = name
             session.stage = "environment"
             session.created_at = time.monotonic()
-            await _reply(message, M.M11_ASK_ENV + "\n\nRender Free web services must listen on the PORT environment variable. Polling-only bots without an HTTP listener may fail; always-on background workers require a paid Render plan.", plain=True)
+            docker_note = "\n\nThe selected Docker repository must contain a Dockerfile in its root. Docker deployment also requires a reachable Docker Engine on the Hostify host." if session.runtime_type == "docker" else ""
+            await _reply(message, M.M11_ASK_ENV + docker_note, plain=True)
             return
 
         if session.stage != "environment":
@@ -254,13 +254,13 @@ async def deploy_input_handler(client: Client, message):
         name = session.name
         repo_url = session.repo_url
         runtime_type = session.runtime_type
-        if not name or not repo_url or runtime_type not in {"python", "java", "docker"}:
+        if not name or not repo_url or runtime_type not in {"python", "docker"}:
             _sessions.pop(user.id, None)
             await _reply(message, M.M104_SESSION_INCOMPLETE)
             return
         session.stage = "deploying"
 
-    await _reply(message, f"Creating your {runtime_type.title()} service on Render: {name}. Deployment may take several minutes.")
+    await _reply(message, f"Cloning and deploying {name} locally on the Hostify host using {runtime_type.title()}.")
 
     try:
         try:
@@ -270,39 +270,37 @@ async def deploy_input_handler(client: Client, message):
             await _reply(message, M.M14_DEPLOY_FAIL.format(name=name, reason=str(exc)[:_MAX_DETAIL_CHARS]))
             return
 
-        success, detail = await deploy_to_render(
+        success, detail = await deploy_bot(
             name,
             repo_url,
-            runtime_type,
             env_vars,
             github_token=github_token,
             deployed_by=user.id,
+            runtime_type=runtime_type,
         )
 
         if success:
-            service_id, dashboard_url = detail.split("|", 1)
             try:
                 await post_deploy_announcement(client, name, repo_url, env_vars)
             except Exception:
-                logger.exception("Render service %s deployed, but announcement failed", name)
+                logger.exception("Bot %s deployed, but its channel announcement failed", name)
             response = (
-                f"Deployment successful: {name}\n"
-                f"Runtime: {runtime_type.title()}\n"
-                f"Render service: {service_id}\n"
-                f"Dashboard: {dashboard_url}"
+                f"Deployment successful: {name}\\n"
+                f"Runtime: {runtime_type.title()}\\n"
+                f"Process / container: {detail}"
             )
         else:
             response = M.M14_DEPLOY_FAIL.format(
                 name=name,
-                reason=str(detail or "Unknown Render deployment error")[:_MAX_DETAIL_CHARS],
+                reason=str(detail or "Unknown deployment error")[:_MAX_DETAIL_CHARS],
             )
         await _reply(message, response)
 
     except asyncio.CancelledError:
-        logger.warning("Render deployment handler cancelled for %s", name)
+        logger.warning("Deployment handler cancelled for %s", name)
         raise
     except Exception:
-        logger.exception("Unexpected Render deployment-flow failure for %s", name)
+        logger.exception("Unexpected deployment-flow failure for %s", name)
         await _reply(message, M.M105_DEPLOY_UNEXPECTED_FAILURE.format(name=name))
     finally:
         async with _session_lock:
