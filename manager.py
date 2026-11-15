@@ -156,12 +156,23 @@ async def restart_bot(name: str) -> tuple[bool, str | None]:
     if not bot:
         return False, "not_found"
     if bot.get("runtime_type", "python") == "docker":
-        container_name, _ = _docker_names(name)
-        code, output = await _docker_command(["restart", container_name], timeout=45)
-        if code != 0:
-            return False, output or "Docker could not restart the container."
+        bot_dir = _bot_directory(name)
+        if bot_dir.is_dir():
+            # Recreate from the saved encrypted MongoDB environment so edited
+            # variables actually reach the new container.
+            from deployer import _launch_docker_container
+            launched, detail = await _launch_docker_container(
+                bot_dir, name, bot.get("env_vars") or {}, build=False, replace=True
+            )
+            if not launched:
+                return False, detail
+        else:
+            container_name, _ = _docker_names(name)
+            code, detail = await _docker_command(["restart", container_name], timeout=45)
+            if code != 0:
+                return False, detail or "Docker could not restart the container."
         await update_status(name, "running", None, None)
-        return True, container_name
+        return True, _docker_names(name)[0]
 
     ok, detail = await _terminate_bot_process(bot, name)
     if not ok:
