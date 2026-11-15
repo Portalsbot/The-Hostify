@@ -21,7 +21,7 @@ _PROCESS_TIME_TOLERANCE = 1.5
 
 async def _alive(bot: dict) -> bool:
     """Check Docker state or PID identity before attempting a restart."""
-    if bot.get("runtime_type", "python") == "docker":
+    if bot.get("runtime_type", "python") in {"docker", "java"}:
         container_name, _ = _docker_names(str(bot.get("name") or ""))
         code, output = await _docker_command(
             ["inspect", "--format", "{{.State.Running}}", container_name],
