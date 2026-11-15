@@ -304,8 +304,11 @@ async def _docker_command(
             env={
                 "PATH": os.getenv("PATH", "/usr/local/bin:/usr/bin:/bin"),
                 "HOME": os.getenv("HOME", "/tmp"),
-                **({"DOCKER_HOST": os.environ["DOCKER_HOST"]} if os.getenv("DOCKER_HOST") else {}),
-                **({"DOCKER_CONFIG": os.environ["DOCKER_CONFIG"]} if os.getenv("DOCKER_CONFIG") else {}),
+                **({
+                    key: os.environ[key]
+                    for key in ("DOCKER_HOST", "DOCKER_CONFIG", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "DOCKER_CONTEXT")
+                    if os.getenv(key)
+                }),
             },
         )
     except FileNotFoundError:
@@ -337,7 +340,7 @@ def _write_docker_env(bot_dir: Path, env_vars: dict[str, str]) -> Path:
         raise ValueError("Refusing to write Docker environment values through a symbolic link.")
     lines = []
     for key, value in env_vars.items():
-        if "\n" in value or "\\r" in value:
+        if "\n" in value or "\r" in value:
             raise ValueError(f"Docker environment variable {key} cannot contain newline characters.")
         lines.append(f"{key}={value}")
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
@@ -628,10 +631,8 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
         name = _validate_name(name)
         safe_env = _validate_env_vars(env_vars)
         bot_dir = _bot_directory(name)
-        if not bot_dir.is_dir():
-            return False, "Bot folder missing."
-
-        if (await get_bot(name) or {}).get("runtime_type", "python") == "docker":
+        bot_record = await get_bot(name) or {}
+        if bot_record.get("runtime_type", "python") == "docker":
             container_name, image_name = _docker_names(name)
             available, detail = await _docker_engine_status()
             if not available:
@@ -655,6 +656,9 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
                 await update_status(name, "running", None, None)
                 return True, detail
             return False, detail
+
+        if not bot_dir.is_dir():
+            return False, "Bot folder missing."
 
         process = await _launch(bot_dir, safe_env)
         try:
