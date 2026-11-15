@@ -12,8 +12,7 @@ import psutil
 from config import BASE_DIR
 from database import delete_bot as db_delete
 from database import get_bot, update_status
-from deployer import launch_existing
-from render_deployer import render_service_action
+from deployer import launch_existing, _docker_command, _docker_names
 
 _PROCESS_TIME_TOLERANCE = 1.5
 _STOP_TIMEOUT_SECONDS = 8
@@ -130,13 +129,17 @@ async def stop_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
-    if bot.get("deployment_provider") == "render":
-        return await render_service_action(name, "stop")
+    if bot.get("runtime_type", "python") == "docker":
+        container_name, _ = _docker_names(name)
+        code, output = await _docker_command(["stop", container_name], timeout=30)
+        if code != 0 and "No such container" not in output:
+            return False, output or "Docker could not stop the container."
+        await update_status(name, "stopped", None, None)
+        return True, None
 
     ok, detail = await _terminate_bot_process(bot, name)
     if not ok:
         return False, detail
-
     await update_status(name, "stopped", None, None)
     return True, None
 
@@ -145,8 +148,6 @@ async def start_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
-    if bot.get("deployment_provider") == "render":
-        return await render_service_action(name, "run")
     return await launch_existing(name, bot.get("env_vars") or {})
 
 
@@ -154,13 +155,17 @@ async def restart_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
-    if bot.get("deployment_provider") == "render":
-        return await render_service_action(name, "restart")
+    if bot.get("runtime_type", "python") == "docker":
+        container_name, _ = _docker_names(name)
+        code, output = await _docker_command(["restart", container_name], timeout=45)
+        if code != 0:
+            return False, output or "Docker could not restart the container."
+        await update_status(name, "running", None, None)
+        return True, container_name
 
     ok, detail = await _terminate_bot_process(bot, name)
     if not ok:
         return False, detail
-
     await update_status(name, "stopped", None, None)
     await asyncio.sleep(0.5)
     return await launch_existing(name, bot.get("env_vars") or {})
@@ -170,13 +175,24 @@ async def delete_bot(name: str) -> tuple[bool, str | None]:
     bot = await get_bot(name)
     if not bot:
         return False, "not_found"
-    if bot.get("deployment_provider") == "render":
-        return await render_service_action(name, "delete")
+
+    if bot.get("runtime_type", "python") == "docker":
+        container_name, _ = _docker_names(name)
+        code, output = await _docker_command(["rm", "--force", container_name], timeout=30)
+        if code != 0 and "No such container" not in output:
+            return False, output or "Docker could not remove the container."
+        try:
+            bot_dir = _bot_directory(name)
+            if bot_dir.exists():
+                shutil.rmtree(bot_dir)
+            await db_delete(name)
+            return True, None
+        except (OSError, RuntimeError, ValueError) as exc:
+            return False, str(exc)
 
     ok, detail = await _terminate_bot_process(bot, name)
     if not ok:
         return False, detail
-
     try:
         bot_dir = _bot_directory(name)
         if bot_dir.exists():
@@ -184,15 +200,37 @@ async def delete_bot(name: str) -> tuple[bool, str | None]:
         await db_delete(name)
         return True, None
     except (OSError, RuntimeError, ValueError) as exc:
-        # Keep the database record if filesystem deletion failed, so the
-        # operator can inspect and retry instead of losing track of the folder.
         await update_status(name, "stopped", None, None)
         return False, str(exc)
 
 
-def read_logs(name: str, lines: int = 20) -> list[str] | None:
+def read_logs(name: str, lines: int = 20, runtime_type: str = "python") -> list[str] | None:
     if not isinstance(lines, int) or not 1 <= lines <= 200:
         raise ValueError("Log line count must be between 1 and 200.")
+
+    if runtime_type == "docker":
+        container_name, _ = _docker_names(name)
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["docker", "logs", "--tail", str(lines), container_name],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                env={
+                    "PATH": os.getenv("PATH", "/usr/local/bin:/usr/bin:/bin"),
+                    "HOME": os.getenv("HOME", "/tmp"),
+                    **({"DOCKER_HOST": os.environ["DOCKER_HOST"]} if os.getenv("DOCKER_HOST") else {}),
+                    **({"DOCKER_CONFIG": os.environ["DOCKER_CONFIG"]} if os.getenv("DOCKER_CONFIG") else {}),
+                },
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return [f"Could not read Docker logs: {exc}"]
+        output = (result.stdout or "") + (result.stderr or "")
+        if result.returncode != 0:
+            return output.splitlines()[-lines:] or ["Docker logs are unavailable."]
+        return output.splitlines()[-lines:]
 
     bot_dir = _bot_directory(name)
     log_path = bot_dir / "bot.log"
@@ -204,5 +242,4 @@ def read_logs(name: str, lines: int = 20) -> list[str] | None:
         size = stream.tell()
         stream.seek(max(0, size - 64 * 1024))
         data = stream.read(64 * 1024).decode("utf-8", errors="replace")
-
     return data.splitlines()[-lines:]
