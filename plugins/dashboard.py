@@ -122,7 +122,7 @@ def _detail_text(bot: dict) -> str:
     created_text = created.strftime("%Y-%m-%d %H:%M UTC") if isinstance(created, datetime) else "Unknown"
     runtime_type = str(bot.get("runtime_type") or "python").title()
     pid = bot.get("pid") or "—"
-    process_line = f"Container: {bot.get('container_id', 'managed by Docker')}" if runtime_type == "Docker" else f"PID: {pid}"
+    process_line = "Container: managed by Docker" if runtime_type == "Docker" else f"PID: {pid}"
     username = "@" + str(bot.get("bot_username")) if bot.get("bot_username") else "Not detected"
     return (
         f"BOT SETTINGS: {name}\n\n"
