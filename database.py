@@ -72,6 +72,8 @@ async def add_bot(
     env_vars: dict[str, str] | None = None,
     notify_channel: str | None = None,
     deployed_by: int | None = None,
+    runtime_type: str = "python",
+    container_id: str | None = None,
 ) -> None:
     """Insert or refresh a bot record; environment secrets are encrypted at rest."""
     now = datetime.now(timezone.utc)
@@ -82,6 +84,9 @@ async def add_bot(
             "$set": {
                 "name": name,
                 "repo_url": repo_url,
+                "runtime_type": runtime_type,
+                "container_id": container_id,
+                "deployment_provider": "local",
                 "env_vars": encrypted_env,
                 "notify_channel": notify_channel,
                 "deployed_by": int(deployed_by) if deployed_by else None,
@@ -94,50 +99,6 @@ async def add_bot(
             "$setOnInsert": {"created_at": now},
         },
         upsert=True,
-    )
-
-
-async def add_render_bot(
-    *, name: str, repo_url: str, env_vars: dict[str, str], deployed_by: int,
-    runtime_type: str, service_id: str, deploy_id: str,
-    service_url: str | None = None, status: str = "deploying",
-) -> None:
-    """Persist a Render-managed deployment; no local project folder is required."""
-    now = datetime.now(timezone.utc)
-    await _bots.update_one(
-        {"name": name},
-        {
-            "$set": {
-                "name": name,
-                "repo_url": repo_url,
-                "env_vars": encrypt_env_vars(env_vars),
-                "deployed_by": int(deployed_by),
-                "deployment_provider": "render",
-                "runtime_type": runtime_type,
-                "render_service_id": service_id,
-                "render_deploy_id": deploy_id,
-                "service_url": service_url,
-                "deploy_status": "created",
-                "status": status,
-                "pid": None,
-                "pid_created_at": None,
-                "bot_username": None,
-                "updated_at": now,
-            },
-            "$setOnInsert": {"created_at": now},
-        },
-        upsert=True,
-    )
-
-
-async def update_render_deployment(name: str, *, status: str, deploy_status: str) -> None:
-    await _bots.update_one(
-        {"name": name, "deployment_provider": "render"},
-        {"$set": {
-            "status": status,
-            "deploy_status": deploy_status,
-            "updated_at": datetime.now(timezone.utc),
-        }},
     )
 
 
@@ -156,11 +117,7 @@ async def list_bots(limit: int = 1_000, deployed_by: int | None = None) -> list[
 
 
 async def update_bot_env(name: str, env_vars: dict[str, str]) -> None:
-    """Apply Render environment changes first, then persist encrypted values."""
-    current = await get_bot(name)
-    if current and current.get("deployment_provider") == "render":
-        from render_deployer import update_render_environment
-        await update_render_environment(name, env_vars)
+    """Persist encrypted environment values for a locally managed deployment."""
     await _bots.update_one(
         {"name": name},
         {"$set": {
