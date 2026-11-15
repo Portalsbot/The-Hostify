@@ -192,6 +192,8 @@ async def delete_bot(name: str) -> tuple[bool, str | None]:
         code, output = await _docker_command(["rm", "--force", container_name], timeout=30)
         if code != 0 and "No such container" not in output:
             return False, output or "Docker could not remove the container."
+        _, image_name = _docker_names(name)
+        await _docker_command(["rmi", image_name], timeout=60)
         try:
             bot_dir = _bot_directory(name)
             if bot_dir.exists():
@@ -233,7 +235,11 @@ def read_logs(name: str, lines: int = 20, runtime_type: str = "python") -> list[
                     "PATH": os.getenv("PATH", "/usr/local/bin:/usr/bin:/bin"),
                     "HOME": os.getenv("HOME", "/tmp"),
                     **({"DOCKER_HOST": os.environ["DOCKER_HOST"]} if os.getenv("DOCKER_HOST") else {}),
-                    **({"DOCKER_CONFIG": os.environ["DOCKER_CONFIG"]} if os.getenv("DOCKER_CONFIG") else {}),
+                    **({
+                        key: os.environ[key]
+                        for key in ("DOCKER_CONFIG", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "DOCKER_CONTEXT")
+                        if os.getenv(key)
+                    }),
                 },
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
