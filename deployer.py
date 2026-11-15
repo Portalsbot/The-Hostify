@@ -663,6 +663,73 @@ async def deploy_bot(
             return False, "Unexpected deployment error. Check controller logs."
 
 
+async def _restore_docker_bot_folder(name: str, bot_dir: Path, repo_url: str) -> tuple[bool, str]:
+    """Restore a Docker build context from GitHub after local storage loss."""
+    if bot_dir.is_dir():
+        return True, "Docker build context is present."
+    github_token = None
+    try:
+        from github_app import get_installation_token_for_repository
+        github_token = await get_installation_token_for_repository(repo_url)
+    except Exception as exc:
+        logger.warning("GitHub App token unavailable while restoring Docker source for %s: %s", name, exc)
+
+    bot_dir.parent.mkdir(parents=True, exist_ok=True)
+    clone_env = {
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "HOME": str(bot_dir.parent),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+    askpass_dir = None
+    try:
+        if github_token:
+            askpass_dir = Path(tempfile.mkdtemp(prefix=f".{name}.docker-restore-auth-", dir=str(bot_dir.parent)))
+            askpass = askpass_dir / "askpass.sh"
+            askpass.write_text(
+                "#!/bin/sh\\n"
+                "case \\"$1\\" in\\n"
+                "  *Username*) printf '%s\\n' 'x-access-token' ;;\\n"
+                "  *Password*) printf '%s\\n' \\"$HOSTIFY_GITHUB_TOKEN\\" ;;\\n"
+                "  *) exit 1 ;;\\n"
+                "esac\\n",
+                encoding="utf-8",
+            )
+            askpass.chmod(0o700)
+            clone_env.update({
+                "HOME": str(askpass_dir),
+                "GIT_ASKPASS": str(askpass),
+                "GIT_ASKPASS_REQUIRE": "force",
+                "HOSTIFY_GITHUB_TOKEN": github_token,
+            })
+        code, output = await _run_logged(
+            ["git", "clone", "--depth", "1", "--", repo_url, str(bot_dir)],
+            cwd=bot_dir.parent,
+            env=clone_env,
+            log_path=bot_dir.parent / f".{name}.docker-restore.log",
+            timeout=CLONE_TIMEOUT_SECONDS,
+        )
+    except (OSError, RuntimeError, TimeoutError) as exc:
+        shutil.rmtree(bot_dir, ignore_errors=True)
+        return False, f"Could not restore Docker repository source: {exc}"
+    finally:
+        clone_env.pop("HOSTIFY_GITHUB_TOKEN", None)
+        if askpass_dir is not None:
+            shutil.rmtree(askpass_dir, ignore_errors=True)
+
+    if code != 0:
+        shutil.rmtree(bot_dir, ignore_errors=True)
+        return False, f"Git clone failed while restoring Docker source: {output[-1800:]}"
+    dockerfile = bot_dir / "Dockerfile"
+    if dockerfile.is_symlink() or not dockerfile.is_file():
+        shutil.rmtree(bot_dir, ignore_errors=True)
+        return False, "Restored repository does not contain a root-level Dockerfile."
+    logger.info("Restored Docker build context for %s from %s", name, repo_url)
+    return True, "Docker build context restored."
+
+
 async def _restore_python_bot_folder(name: str, bot_dir: Path, repo_url: str) -> tuple[bool, str]:
     """Re-clone tracked source and rebuild the Python environment after ephemeral storage loss."""
     if bot_dir.exists():
@@ -740,6 +807,9 @@ async def _restore_python_bot_folder(name: str, bot_dir: Path, repo_url: str) ->
         shutil.rmtree(bot_dir, ignore_errors=True)
         return False, f"Could not recreate Python virtual environment: {venv_log[-1800:]}"
 
+    for runtime_dir in (bot_dir / ".home", bot_dir / ".tmp"):
+        runtime_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+
     requirements = bot_dir / "requirements.txt"
     if requirements.exists():
         if requirements.is_symlink() or not requirements.is_file():
@@ -782,6 +852,13 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
         bot_dir = _bot_directory(name)
         bot_record = await get_bot(name) or {}
         if bot_record.get("runtime_type", "python") in {"docker", "java"}:
+            if not bot_dir.is_dir():
+                repo_url = bot_record.get("repo_url")
+                if not isinstance(repo_url, str) or not repo_url:
+                    return False, "Docker container and local build folder are missing; no repository URL is saved for recovery."
+                restored, restore_detail = await _restore_docker_bot_folder(name, bot_dir, repo_url)
+                if not restored:
+                    return False, restore_detail
             container_name, image_name = _docker_names(name)
             available, detail = await _docker_engine_status()
             if not available:
