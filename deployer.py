@@ -374,11 +374,25 @@ async def _launch_docker_container(
         return False, "Docker deployment requires a regular Dockerfile in the repository root."
 
     if build:
-        code, output = await _docker_command(
-            ["build", "--tag", image_name, "--file", "Dockerfile", "."],
-            cwd=bot_dir,
-            timeout=PIP_TIMEOUT_SECONDS,
-        )
+        # Never let Docker COPY instructions capture Hostify's private runtime
+        # environment file from a previous run.
+        env_secret_file = bot_dir / ".hostify.env"
+        parked_env_file = bot_dir.parent / f".{container_name}.hostify-env.tmp"
+        parked = False
+        if env_secret_file.exists():
+            if env_secret_file.is_symlink() or parked_env_file.exists():
+                return False, "Could not safely exclude the private Docker environment file from the build context."
+            os.replace(env_secret_file, parked_env_file)
+            parked = True
+        try:
+            code, output = await _docker_command(
+                ["build", "--tag", image_name, "--file", "Dockerfile", "."],
+                cwd=bot_dir,
+                timeout=PIP_TIMEOUT_SECONDS,
+            )
+        finally:
+            if parked and parked_env_file.exists():
+                os.replace(parked_env_file, env_secret_file)
         if code != 0:
             return False, f"Docker image build failed (exit {code}):\n{output[-2600:]}"
 
@@ -406,7 +420,7 @@ async def _launch_docker_container(
         return False, f"Docker container start failed (exit {code}):\n{output[-2600:]}"
 
     container_id = output.strip().splitlines()[-1] if output.strip() else container_name
-    await asyncio.sleep(1)
+    await asyncio.sleep(3)
     if not await _docker_container_running(container_name):
         _, logs = await _docker_command(["logs", "--tail", "60", container_name], timeout=15)
         await _docker_command(["rm", "--force", container_name], timeout=30)
