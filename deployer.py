@@ -462,7 +462,7 @@ async def deploy_bot(
         return False, (
             "Deployment is disabled. Set ALLOW_UNSANDBOXED_DEPLOYMENTS=true only for repositories you trust."
         )
-    if runtime_type not in {"python", "docker"}:
+    if runtime_type not in {"python", "java", "docker"}:
         return False, "Choose either Python or Docker deployment."
     if runtime_type == "docker":
         available, detail = await _docker_engine_status()
@@ -537,7 +537,7 @@ async def deploy_bot(
                 shutil.rmtree(bot_dir, ignore_errors=True)
                 return False, f"Git clone failed: {clone_log[-1800:] or 'inspect the controller deployment log.'}"
 
-            if runtime_type == "docker":
+            if runtime_type in {"docker", "java"}:
                 dockerfile = bot_dir / "Dockerfile"
                 if dockerfile.is_symlink() or not dockerfile.is_file():
                     shutil.rmtree(bot_dir, ignore_errors=True)
@@ -553,7 +553,7 @@ async def deploy_bot(
                 try:
                     await add_bot(
                         name, repo_url, safe_env, notify_channel,
-                        deployed_by=deployed_by, runtime_type="docker", container_id=container_id,
+                        deployed_by=deployed_by, runtime_type=runtime_type, container_id=container_id,
                     )
                     await update_status(name, "running", None, None)
                 except Exception:
@@ -569,7 +569,7 @@ async def deploy_bot(
                             await set_bot_username(name, username)
                         except Exception:
                             logger.exception("Could not save Telegram username for Docker bot %s", name)
-                logger.info("Docker bot %s deployed successfully (container=%s)", name, container_id[:12])
+                logger.info("%s bot %s deployed successfully (container=%s)", runtime_type, name, container_id[:12])
                 return True, f"container {container_id[:12]}"
 
             venv_path = bot_dir / "venv"
@@ -781,7 +781,7 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
         safe_env = _validate_env_vars(env_vars)
         bot_dir = _bot_directory(name)
         bot_record = await get_bot(name) or {}
-        if bot_record.get("runtime_type", "python") == "docker":
+        if bot_record.get("runtime_type", "python") in {"docker", "java"}:
             container_name, image_name = _docker_names(name)
             available, detail = await _docker_engine_status()
             if not available:
