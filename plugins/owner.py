@@ -374,13 +374,16 @@ async def logs_command(client: Client, message):
         await _reply(message, "Usage: /logs NAME.")
         return
     try:
-        lines = read_logs(parts[1], 40) or []
-        output = f"LAST {len(lines)} LOG LINES: {parts[1]}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
+        bot = await get_bot(parts[1])
+        if not bot:
+            await _reply(message, "No deployment with that name was found.")
+            return
+        lines = read_logs(parts[1], 40, runtime_type=str(bot.get("runtime_type") or "python")) or []
+        output = f"LAST {len(lines)} LOG LINES: {parts[1]}\\n\\n" + ("\\n".join(lines) if lines else "No log output is available.")
         await _reply(message, output[-_LOG_LIMIT:])
     except Exception:
         logger.exception("Could not read deployment logs for %s", parts[1])
         await _reply(message, "Could not read deployment logs. Check Hostify logs.")
-
 
 @Client.on_callback_query(filters.regex(r"^hostify:settings:"))
 async def settings_callback(client: Client, query):
