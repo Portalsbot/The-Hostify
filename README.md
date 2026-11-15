@@ -15,7 +15,7 @@ Hostify exposes a small HTTP health endpoint and runs the Telegram controller in
 ## How /deploy works
 
 1. Send `/deploy`.
-2. Select **Python** or **Docker**.
+2. Select **Python**, **Java** or **Docker**.
 3. Send the GitHub repository URL.
 4. Choose a deployment name.
 5. Send environment variables as `KEY=VALUE`, or send `skip`.
@@ -31,9 +31,9 @@ Hostify exposes a small HTTP health endpoint and runs the Telegram controller in
 
 Python project code runs as a child process under the Hostify service account. Only deploy repositories and code you trust.
 
-### Docker projects
+### Java and Docker projects
 
-- The selected repository must contain a root-level `Dockerfile`.
+- Both options use the local Docker Engine. The selected repository must contain a root-level `Dockerfile`.
 - Hostify runs `docker build`, then starts a named container with `--restart unless-stopped`.
 - Environment variables are written to a private `.hostify.env` file and passed using Docker's `--env-file` option.
 - Each container receives a named Docker volume mounted at `/data`; configure the project to store persistent runtime files there. Data written elsewhere inside the container may be lost when the container is recreated.
@@ -137,5 +137,5 @@ Admins can view and manage only deployments they created. The owner can view and
 
 - Local Python deployments share the CPU, RAM and network resources of the single Hostify service. They do not consume additional Render service slots or invoke the Render API.
 - Render Free services may sleep and have ephemeral filesystems. They are not guaranteed 24/7 hosts for long-running child processes.
-- Docker builds and containers require a Docker Engine on the Hostify host. This capability is not available inside a standard native Render Python service.
+- Java and Docker builds/containers require a Docker Engine on the Hostify host. This capability is not available inside a standard native Render Python service.
 - Hostify does not provide a security sandbox for arbitrary Python code. Restrict deployment access to trusted users and repositories.
