@@ -603,7 +603,7 @@ async def deploy_bot(
                 if pip_code != 0:
                     logger.error("Dependency installation failed for %s: %s", name, pip_log[-3_000:])
                     shutil.rmtree(bot_dir, ignore_errors=True)
-                    return False, f"Dependency installation failed: {pip_log[-1800:] or 'unknown error.'"
+                    return False, f"Dependency installation failed: {pip_log[-1800:] or 'unknown error.'}"
 
             if _find_entry(bot_dir) is None:
                 shutil.rmtree(bot_dir, ignore_errors=True)
