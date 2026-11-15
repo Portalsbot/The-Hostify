@@ -104,7 +104,7 @@ Keep the private key in Render's secret environment configuration. Never commit 
 
 | Command | Purpose |
 |---|---|
-| `/deploy` | Deploy a GitHub repository locally as Python or Docker |
+| `/deploy` | Deploy a GitHub repository locally as Python, Java or Docker |
 | `/cancel` | Cancel an active deployment setup |
 | `/list` | View the admin's own deployments |
 | `/mylogs` | View the last 40 Hostify controller log lines |
