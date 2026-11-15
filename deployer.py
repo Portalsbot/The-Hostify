@@ -522,7 +522,7 @@ async def deploy_bot(
             if clone_code != 0:
                 logger.error("Git clone failed for %s: %s", name, clone_log[-3_000:])
                 shutil.rmtree(bot_dir, ignore_errors=True)
-                return False, f"Git clone failed: {clone_log[-1800:] or 'inspect the controller deployment log.'"
+                return False, f"Git clone failed: {clone_log[-1800:] or 'inspect the controller deployment log.'}"
 
             if runtime_type == "docker":
                 dockerfile = bot_dir / "Dockerfile"
@@ -579,7 +579,7 @@ async def deploy_bot(
             if venv_code != 0:
                 logger.error("Virtual environment creation failed for %s: %s", name, venv_log[-3_000:])
                 shutil.rmtree(bot_dir, ignore_errors=True)
-                return False, f"Virtual environment creation failed: {venv_log[-1800:] or 'unknown error.'"
+                return False, f"Virtual environment creation failed: {venv_log[-1800:] or 'unknown error.'}"
 
             requirements = bot_dir / "requirements.txt"
             if requirements.exists():
