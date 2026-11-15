@@ -12,7 +12,7 @@ import psutil
 from config import BASE_DIR
 from database import delete_bot as db_delete
 from database import get_bot, update_status
-from deployer import launch_existing, _docker_command, _docker_names
+from deployer import launch_existing, _docker_command, _docker_names, _docker_volume_name
 
 _PROCESS_TIME_TOLERANCE = 1.5
 _STOP_TIMEOUT_SECONDS = 8
@@ -194,6 +194,7 @@ async def delete_bot(name: str) -> tuple[bool, str | None]:
             return False, output or "Docker could not remove the container."
         _, image_name = _docker_names(name)
         await _docker_command(["rmi", image_name], timeout=60)
+        await _docker_command(["volume", "rm", _docker_volume_name(name)], timeout=30)
         try:
             bot_dir = _bot_directory(name)
             if bot_dir.exists():
