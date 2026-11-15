@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import hashlib
 import os
 import re
 import signal
@@ -284,8 +285,9 @@ async def _launch(bot_dir: Path, env_vars: dict[str, str]) -> asyncio.subprocess
 
 def _docker_names(name: str) -> tuple[str, str]:
     slug = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-")
-    slug = re.sub(r"-+", "-", slug)[:40].rstrip("-")
-    return f"hostify-{slug}", f"hostify/{slug}:latest"
+    slug = re.sub(r"-+", "-", slug)[:32].rstrip("-") or "bot"
+    suffix = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8]
+    return f"hostify-{slug}-{suffix}", f"hostify/{slug}-{suffix}:latest"
 
 
 async def _docker_command(
@@ -301,6 +303,7 @@ async def _docker_command(
             cwd=str(cwd) if cwd else None,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
+            start_new_session=(os.name == "posix"),
             env={
                 "PATH": os.getenv("PATH", "/usr/local/bin:/usr/bin:/bin"),
                 "HOME": os.getenv("HOME", "/tmp"),
@@ -523,12 +526,14 @@ async def deploy_bot(
             if runtime_type == "docker":
                 dockerfile = bot_dir / "Dockerfile"
                 if dockerfile.is_symlink() or not dockerfile.is_file():
+                    shutil.rmtree(bot_dir, ignore_errors=True)
                     return False, "Docker deployment requires a Dockerfile in the repository root."
                 launched, container_id = await _launch_docker_container(
                     bot_dir, name, safe_env, build=True, replace=True
                 )
                 if not launched:
                     logger.error("Docker deployment failed for %s: %s", name, container_id[-2500:])
+                    shutil.rmtree(bot_dir, ignore_errors=True)
                     return False, container_id
                 notify_channel = safe_env.get("NOTIFY_CHANNEL")
                 try:
@@ -540,6 +545,7 @@ async def deploy_bot(
                 except Exception:
                     await _docker_command(["rm", "--force", _docker_names(name)[0]], timeout=30)
                     logger.exception("Database registration failed for Docker bot %s", name)
+                    shutil.rmtree(bot_dir, ignore_errors=True)
                     return False, "Docker container started but database registration failed; container was removed."
                 token = safe_env.get("BOT_TOKEN")
                 if token:
