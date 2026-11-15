@@ -417,6 +417,7 @@ async def deploy_bot(
     env_vars: dict[str, str] | None = None,
     github_token: str | None = None,
     deployed_by: int | None = None,
+    runtime_type: str = "python",
 ):
     """Clone, build and launch one bot. Returns (success, pid_or_reason).
 
