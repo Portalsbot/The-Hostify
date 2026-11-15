@@ -623,6 +623,115 @@ async def deploy_bot(
             return False, "Unexpected deployment error. Check controller logs."
 
 
+async def _restore_python_bot_folder(name: str, bot_dir: Path, repo_url: str) -> tuple[bool, str]:
+    """Re-clone tracked source and rebuild the Python environment after ephemeral storage loss."""
+    if bot_dir.exists():
+        return True, "Project folder is present."
+    github_token = None
+    try:
+        from github_app import get_installation_token_for_repository
+        github_token = await get_installation_token_for_repository(repo_url)
+    except Exception as exc:
+        logger.warning("GitHub App token unavailable while restoring %s: %s", name, exc)
+
+    bot_dir.parent.mkdir(parents=True, exist_ok=True)
+    clone_env = {
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "HOME": str(bot_dir.parent),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+    askpass_dir = None
+    try:
+        if github_token:
+            askpass_dir = Path(tempfile.mkdtemp(prefix=f".{name}.restore-auth-", dir=str(bot_dir.parent)))
+            askpass = askpass_dir / "askpass.sh"
+            askpass.write_text(
+                "#!/bin/sh\\n"
+                "case \\"$1\\" in\\n"
+                "  *Username*) printf '%s\\n' 'x-access-token' ;;\\n"
+                "  *Password*) printf '%s\\n' \\"$HOSTIFY_GITHUB_TOKEN\\" ;;\\n"
+                "  *) exit 1 ;;\\n"
+                "esac\\n",
+                encoding="utf-8",
+            )
+            askpass.chmod(0o700)
+            clone_env.update({
+                "HOME": str(askpass_dir),
+                "GIT_ASKPASS": str(askpass),
+                "GIT_ASKPASS_REQUIRE": "force",
+                "HOSTIFY_GITHUB_TOKEN": github_token,
+            })
+        clone_code, clone_log = await _run_logged(
+            ["git", "clone", "--depth", "1", "--", repo_url, str(bot_dir)],
+            cwd=bot_dir.parent,
+            env=clone_env,
+            log_path=bot_dir.parent / f".{name}.restore.log",
+            timeout=CLONE_TIMEOUT_SECONDS,
+        )
+    except (OSError, RuntimeError, TimeoutError) as exc:
+        shutil.rmtree(bot_dir, ignore_errors=True)
+        return False, f"Could not restore repository source: {exc}"
+    finally:
+        clone_env.pop("HOSTIFY_GITHUB_TOKEN", None)
+        if askpass_dir is not None:
+            shutil.rmtree(askpass_dir, ignore_errors=True)
+
+    if clone_code != 0:
+        shutil.rmtree(bot_dir, ignore_errors=True)
+        return False, f"Git clone failed while restoring source: {clone_log[-1800:]}"
+
+    entry = _find_entry(bot_dir)
+    if entry is None:
+        shutil.rmtree(bot_dir, ignore_errors=True)
+        return False, "Restored repository has no main.py, bot.py, or app.py entry point."
+
+    venv_path = bot_dir / "venv"
+    venv_code, venv_log = await _run_logged(
+        [sys.executable, "-m", "venv", str(venv_path)],
+        cwd=bot_dir,
+        env={"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(bot_dir / ".home")},
+        log_path=bot_dir / "deploy.log",
+        timeout=VENV_TIMEOUT_SECONDS,
+    )
+    if venv_code != 0:
+        shutil.rmtree(bot_dir, ignore_errors=True)
+        return False, f"Could not recreate Python virtual environment: {venv_log[-1800:]}"
+
+    requirements = bot_dir / "requirements.txt"
+    if requirements.exists():
+        if requirements.is_symlink() or not requirements.is_file():
+            shutil.rmtree(bot_dir, ignore_errors=True)
+            return False, "Restored requirements.txt is not a regular file."
+        pip_code, pip_log = await _run_logged(
+            [
+                str(venv_path / "bin" / "python"), "-m", "pip", "install",
+                "--disable-pip-version-check", "--no-input", "-r", str(requirements),
+            ],
+            cwd=bot_dir,
+            env={
+                "PATH": f"{venv_path / 'bin'}:/usr/local/bin:/usr/bin:/bin",
+                "HOME": str(bot_dir / ".home"),
+                "TMPDIR": str(bot_dir / ".tmp"),
+                "LANG": "C.UTF-8",
+                "LC_ALL": "C.UTF-8",
+                "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+            },
+            log_path=bot_dir / "deploy.log",
+            timeout=PIP_TIMEOUT_SECONDS,
+        )
+        if pip_code != 0:
+            shutil.rmtree(bot_dir, ignore_errors=True)
+            return False, f"Dependency installation failed while restoring source: {pip_log[-1800:]}"
+
+    logger.info("Restored local project folder for %s from %s", name, repo_url)
+    return True, "Repository source and dependencies restored."
+
+
+
+
 async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
     """Restart an existing bot without re-cloning or reinstalling dependencies."""
     if not ALLOW_UNSANDBOXED_DEPLOYMENTS:
@@ -658,7 +767,12 @@ async def launch_existing(name: str, env_vars: dict[str, str] | None = None):
             return False, detail
 
         if not bot_dir.is_dir():
-            return False, "Bot folder missing."
+            repo_url = bot_record.get("repo_url")
+            if not isinstance(repo_url, str) or not repo_url:
+                return False, "Bot folder missing and no repository URL is saved for recovery."
+            restored, detail = await _restore_python_bot_folder(name, bot_dir, repo_url)
+            if not restored:
+                return False, detail
 
         process = await _launch(bot_dir, safe_env)
         try:
