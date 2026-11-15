@@ -285,8 +285,8 @@ async def deploy_input_handler(client: Client, message):
             except Exception:
                 logger.exception("Bot %s deployed, but its channel announcement failed", name)
             response = (
-                f"Deployment successful: {name}\\n"
-                f"Runtime: {runtime_type.title()}\\n"
+                f"Deployment successful: {name}\n"
+                f"Runtime: {runtime_type.title()}\n"
                 f"Process / container: {detail}"
             )
         else:
