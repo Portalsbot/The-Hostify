@@ -36,7 +36,8 @@ Python project code runs as a child process under the Hostify service account. O
 - The selected repository must contain a root-level `Dockerfile`.
 - Hostify runs `docker build`, then starts a named container with `--restart unless-stopped`.
 - Environment variables are written to a private `.hostify.env` file and passed using Docker's `--env-file` option.
-- Run, Stop, Restart, Delete and Logs operate on that Docker container.
+- Each container receives a named Docker volume mounted at `/data`; configure the project to store persistent runtime files there. Data written elsewhere inside the container may be lost when the container is recreated.
+- Run, Stop, Restart, Delete and Logs operate on that Docker container. Delete removes the container, image and its named data volume.
 
 **Docker requires both the Docker CLI and a reachable Docker Engine that the Hostify process is permitted to control.** A native Render Python Web Service does not provide a Docker daemon or privileged container access. Therefore Python deployments can run directly on the current native Render service, but Docker deployments will only work when Hostify is running on a Docker-enabled host. Installing the Docker CLI alone does not provide the Engine.
 
