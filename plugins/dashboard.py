@@ -125,14 +125,14 @@ def _detail_text(bot: dict) -> str:
     process_line = f"Container: {bot.get('container_id', 'managed by Docker')}" if runtime_type == "Docker" else f"PID: {pid}"
     username = "@" + str(bot.get("bot_username")) if bot.get("bot_username") else "Not detected"
     return (
-        f"BOT SETTINGS: {name}\\n\\n"
-        f"Status: {bot.get('status', 'unknown')}\\n"
-        f"Runtime: {runtime_type}\\n"
-        f"Bot username: {username}\\n"
-        f"{process_line}\\n"
-        f"Repository: {bot.get('repo_url', 'Unknown')}\\n"
-        f"Deployed by ID: {bot.get('deployed_by', 'Legacy deployment')}\\n"
-        f"Created: {created_text}\\nEnvironment variables: {len(env_keys)}"
+        f"BOT SETTINGS: {name}\n\n"
+        f"Status: {bot.get('status', 'unknown')}\n"
+        f"Runtime: {runtime_type}\n"
+        f"Bot username: {username}\n"
+        f"{process_line}\n"
+        f"Repository: {bot.get('repo_url', 'Unknown')}\n"
+        f"Deployed by ID: {bot.get('deployed_by', 'Legacy deployment')}\n"
+        f"Created: {created_text}\nEnvironment variables: {len(env_keys)}"
     )
 
 
@@ -326,7 +326,7 @@ async def bot_callback(client: Client, query):
         try:
             runtime_type = str(bot.get("runtime_type") or "python")
             lines = read_logs(name, 40, runtime_type=runtime_type)
-            output = f"LAST {len(lines or [])} LOG LINES: {name}\\n\\n" + ("\\n".join(lines) if lines else "No log output is available.")
+            output = f"LAST {len(lines or [])} LOG LINES: {name}\n\n" + ("\n".join(lines) if lines else "No log output is available.")
             await query.message.edit_text(
                 _quoted(output[-3400:]),
                 parse_mode=ParseMode.HTML,
