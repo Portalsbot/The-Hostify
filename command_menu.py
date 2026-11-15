@@ -18,7 +18,7 @@ PUBLIC_COMMANDS = [
 ]
 
 ADMIN_COMMANDS = PUBLIC_COMMANDS + [
-    {"command": "deploy", "description": "Deploy a permitted Python repository"},
+    {"command": "deploy", "description": "Deploy a GitHub repository as Python or Docker"},
     {"command": "cancel", "description": "Cancel the current setup"},
     {"command": "list", "description": "View your deployments"},
     {"command": "mylogs", "description": "View recent Hostify controller logs"},
@@ -28,7 +28,7 @@ ADMIN_COMMANDS = PUBLIC_COMMANDS + [
 
 OWNER_COMMANDS = PUBLIC_COMMANDS + [
     {"command": "commands", "description": "View owner-only commands"},
-    {"command": "deploy", "description": "Deploy a permitted Python repository"},
+    {"command": "deploy", "description": "Deploy a GitHub repository as Python or Docker"},
     {"command": "cancel", "description": "Cancel the current setup"},
     {"command": "list", "description": "View every deployment"},
     {"command": "stop", "description": "Stop a deployed bot"},
