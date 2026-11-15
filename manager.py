@@ -192,7 +192,7 @@ async def delete_bot(name: str) -> tuple[bool, str | None]:
     if not bot:
         return False, "not_found"
 
-    if bot.get("runtime_type", "python") == "docker":
+    if bot.get("runtime_type", "python") in {"docker", "java"}:
         container_name, _ = _docker_names(name)
         code, output = await _docker_command(["rm", "--force", container_name], timeout=30)
         if code != 0 and "No such container" not in output:
