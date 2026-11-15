@@ -412,6 +412,13 @@ async def _launch_docker_container(
     except (OSError, ValueError) as exc:
         return False, str(exc)
 
+    volume_code, volume_output = await _docker_command(
+        ["volume", "create", _docker_volume_name(name)],
+        timeout=30,
+    )
+    if volume_code != 0:
+        return False, volume_output or "Docker could not create the deployment data volume."
+
     code, output = await _docker_command(
         [
             "run", "--detach",
